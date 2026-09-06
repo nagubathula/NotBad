@@ -95,6 +95,22 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     _controller.addListener(_onTextChanged);
     _updateWindowTitle();
     _initWindow();
+    // Diagnostic key logging, enabled only via NOTBAD_KEYLOG=<file path>.
+    final keylog = Platform.environment['NOTBAD_KEYLOG'];
+    if (keylog != null) {
+      HardwareKeyboard.instance.addHandler((event) {
+        try {
+          File(keylog).writeAsStringSync(
+            '${event.runtimeType} logical=${event.logicalKey.debugName} '
+            'physical=${event.physicalKey.debugName} '
+            'synth=${event.synthesized} '
+            'ctrl=${HardwareKeyboard.instance.isControlPressed}\n',
+            mode: FileMode.append,
+          );
+        } catch (_) {}
+        return false;
+      });
+    }
     onExternalOpen = _handleExternalOpen;
     _autosaveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (widget.settings.autosave && _dirty && _path != null) _save();
@@ -1748,6 +1764,17 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
               ),
             ),
           ),
+          Opacity(
+            opacity: 0.55,
+            child: IconButton(
+              tooltip: 'Commands (Ctrl+K)',
+              onPressed: _showPalette,
+              iconSize: 15,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.keyboard_command_key, color: palette.muted),
+            ),
+          ),
+          const SizedBox(width: 6),
           if (showWindowButtons) ...[
             _WindowButton(
               icon: Icons.remove,

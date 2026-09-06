@@ -4,6 +4,8 @@
 
 NotBad is a lightweight, cross-platform Markdown writer for **Windows, macOS, and Linux**, built with Flutter. It is a from-scratch port of [Trace](https://github.com/john-mrty/Trace) (itself built on the engine of [MarkEdit](https://github.com/MarkEdit-app/MarkEdit)), re-imagined as a **pure-Flutter app**: no embedded web view, no CodeMirror. The Markdown-aware editor is implemented natively in Dart, so the app starts fast, stays small (~28 MB), and behaves identically on every platform.
 
+![NotBad demo — sidebar, command palette, view modes, live styling, focus mode, find, and accent colors](.github/assets/demo.gif)
+
 ## Features
 
 ### Writing
@@ -37,6 +39,22 @@ NotBad is a lightweight, cross-platform Markdown writer for **Windows, macOS, an
 
 ### The small print
 - Seamless window (no title-bar band), warm paper light / neutral dark theme, six accent colors, three line-height presets, zoom (`Ctrl+=`/`-`/`0`), `Ctrl+Tab` to flip to the previous document
+
+## Screenshots
+
+| The editor — concealed syntax | Syntax marks visible |
+|---|---|
+| ![Concealed syntax](.github/assets/editor.png) | ![Marks visible](.github/assets/marks.png) |
+
+| File sidebar | Command palette |
+|---|---|
+| ![Sidebar](.github/assets/sidebar.png) | ![Command palette](.github/assets/palette.png) |
+
+| Focus mode | Light appearance |
+|---|---|
+| ![Focus mode](.github/assets/focus.png) | ![Light theme](.github/assets/editor-light.png) |
+
+A full video walkthrough lives at [.github/assets/demo.mp4](.github/assets/demo.mp4).
 
 ## Repository layout
 
