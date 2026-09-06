@@ -21,10 +21,17 @@ $destExe = Join-Path $destDir 'notbad_flutter.exe'
 
 # --- Copy the app ---------------------------------------------------------
 Write-Host "Installing to $destDir ..."
-if (Get-Process notbad_flutter -ErrorAction SilentlyContinue |
-        Where-Object { $_.Path -eq $destExe }) {
-    Write-Error 'NotBad is currently running from the install folder. Close it and re-run.'
+$running = Get-Process notbad_flutter -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq $destExe }
+foreach ($proc in $running) {
+    if ($proc.MainWindowTitle -like '*Edited*') {
+        Write-Error ('NotBad is running with unsaved changes ' +
+            "(`"$($proc.MainWindowTitle)`"). Save and close it, then re-run.")
+    }
+    Write-Host 'Closing the running NotBad (no unsaved changes) ...'
+    Stop-Process -Id $proc.Id -Force -Confirm:$false
 }
+if ($running) { Start-Sleep -Milliseconds 800 }
 New-Item -ItemType Directory -Force $destDir | Out-Null
 Copy-Item -Path (Join-Path $sourceDir '*') -Destination $destDir -Recurse -Force
 # Keep the uninstaller next to the app so "Installed apps" can call it.

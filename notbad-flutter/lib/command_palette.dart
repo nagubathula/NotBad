@@ -11,6 +11,14 @@ class PaletteAction {
   final String? subtitle;
   final String? shortcut;
   final bool checked;
+
+  /// Hidden while browsing (empty query) but still found by fuzzy search —
+  /// keeps the default list short without losing "type dark to go dark".
+  final bool searchOnly;
+
+  /// Small color dot rendered before the title (accent pickers).
+  final Color? swatch;
+
   final VoidCallback run;
 
   const PaletteAction({
@@ -20,6 +28,8 @@ class PaletteAction {
     this.subtitle,
     this.shortcut,
     this.checked = false,
+    this.searchOnly = false,
+    this.swatch,
   });
 }
 
@@ -66,7 +76,7 @@ class _CommandPaletteState extends State<_CommandPalette> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   var _selected = 0;
-  late List<PaletteAction> _filtered = widget.actions;
+  late List<PaletteAction> _filtered = _fuzzyFilter(widget.actions, '');
 
   @override
   void dispose() {
@@ -193,6 +203,17 @@ class _CommandPaletteState extends State<_CommandPalette> {
               Icon(Icons.check, size: 15, color: palette.fg),
               const SizedBox(width: 6),
             ],
+            if (action.swatch != null) ...[
+              Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(
+                  color: action.swatch,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -229,7 +250,7 @@ class _CommandPaletteState extends State<_CommandPalette> {
 /// matches rank higher.
 List<PaletteAction> _fuzzyFilter(List<PaletteAction> actions, String query) {
   final q = query.trim().toLowerCase();
-  if (q.isEmpty) return actions;
+  if (q.isEmpty) return [for (final a in actions) if (!a.searchOnly) a];
   final scored = <(int, PaletteAction)>[];
   for (final action in actions) {
     final score = _fuzzyScore(action.title.toLowerCase(), q) ??

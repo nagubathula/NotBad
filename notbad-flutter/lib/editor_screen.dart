@@ -21,7 +21,7 @@ import 'sidebar.dart';
 import 'theme.dart';
 
 const kAppVersion = '1.0.0';
-const kUpdateRepo = 'billjotorg/NotBad';
+const kUpdateRepo = 'nagubathula/NotBad';
 
 /// Hook the single-instance server uses to hand a file path (or an empty
 /// string, meaning "just focus") to the running editor.
@@ -1194,9 +1194,128 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
 
   // ---- Command palette ---------------------------------------------------
 
-  void _showPalette() {
+  void _showPalette() =>
+      showCommandPalette(context, _palette, _rootActions());
+
+  void _openSub(List<PaletteAction> Function() actions) {
+    // Reopen the palette one level deeper on the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showCommandPalette(context, _palette, actions());
+    });
+  }
+
+  String _cap(String s) => '${s[0].toUpperCase()}${s.substring(1)}';
+
+  List<PaletteAction> _viewModeActions({bool searchOnly = false}) => [
+        for (final mode in MarkdownViewMode.values)
+          PaletteAction(
+              title: 'View: ${mode.label}',
+              category: 'View',
+              searchOnly: searchOnly,
+              checked: _controller.viewMode == mode,
+              run: () => _setViewMode(mode)),
+      ];
+
+  List<PaletteAction> _appearanceActions({bool searchOnly = false}) => [
+        for (final mode in ThemeMode.values)
+          PaletteAction(
+              title: 'Appearance: ${_cap(mode.name)}',
+              category: 'Settings',
+              searchOnly: searchOnly,
+              checked: widget.settings.themeMode == mode,
+              run: () => widget.settings.setThemeMode(mode)),
+      ];
+
+  List<PaletteAction> _accentActions({bool searchOnly = false}) => [
+        for (final entry in kAccents.entries)
+          PaletteAction(
+              title: 'Accent: ${entry.value.name}',
+              category: 'Settings',
+              searchOnly: searchOnly,
+              checked: widget.settings.accent == entry.key,
+              swatch: entry.value
+                  .forBrightness(Theme.of(context).brightness),
+              run: () => widget.settings.setAccent(entry.key)),
+      ];
+
+  List<PaletteAction> _lineHeightActions({bool searchOnly = false}) => [
+        for (final (label, value) in [
+          ('Tight', 1.6),
+          ('Normal', 1.85),
+          ('Relaxed', 2.1)
+        ])
+          PaletteAction(
+              title: 'Line Height: $label',
+              category: 'Settings',
+              searchOnly: searchOnly,
+              checked: widget.settings.lineHeight == value,
+              run: () => widget.settings.setLineHeight(value)),
+      ];
+
+  List<PaletteAction> _settingsActions({bool searchOnly = false}) {
     final settings = widget.settings;
-    final actions = <PaletteAction>[
+    return [
+      PaletteAction(
+          title: 'Appearance…',
+          category: 'Settings',
+          subtitle: _cap(settings.themeMode.name),
+          searchOnly: searchOnly,
+          run: () => _openSub(_appearanceActions)),
+      PaletteAction(
+          title: 'Accent Color…',
+          category: 'Settings',
+          subtitle: kAccents[settings.accent]?.name,
+          searchOnly: searchOnly,
+          run: () => _openSub(_accentActions)),
+      PaletteAction(
+          title: 'Line Height…',
+          category: 'Settings',
+          searchOnly: searchOnly,
+          run: () => _openSub(_lineHeightActions)),
+      PaletteAction(
+          title: 'Toggle Autosave',
+          category: 'Settings',
+          checked: settings.autosave,
+          searchOnly: searchOnly,
+          run: () => settings.setAutosave(!settings.autosave)),
+      PaletteAction(
+          title: 'Toggle Smart Typography',
+          category: 'Settings',
+          subtitle: 'Curly quotes and — from --',
+          checked: settings.smartTypography,
+          searchOnly: searchOnly,
+          run: () => settings.setSmartTypography(!settings.smartTypography)),
+      PaletteAction(
+          title: 'Zoom In',
+          category: 'Settings',
+          shortcut: 'Ctrl+=',
+          searchOnly: searchOnly,
+          run: () => _zoom(1)),
+      PaletteAction(
+          title: 'Zoom Out',
+          category: 'Settings',
+          shortcut: 'Ctrl+-',
+          searchOnly: searchOnly,
+          run: () => _zoom(-1)),
+      PaletteAction(
+          title: 'Reset Zoom',
+          category: 'Settings',
+          shortcut: 'Ctrl+0',
+          searchOnly: searchOnly,
+          run: _zoomReset),
+      PaletteAction(
+          title: 'Choose Sidebar Folder…',
+          category: 'Settings',
+          searchOnly: searchOnly,
+          run: _pickSidebarRoot),
+    ];
+  }
+
+  /// The root palette: a short, browsable list. Everything nested stays
+  /// reachable by typing — search matches the hidden leaf actions too.
+  List<PaletteAction> _rootActions() {
+    final settings = widget.settings;
+    return [
       PaletteAction(
           title: 'New', category: 'File', shortcut: 'Ctrl+N', run: _newDocument),
       PaletteAction(
@@ -1205,24 +1324,30 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           shortcut: 'Ctrl+O',
           run: _openDialog),
       PaletteAction(
+          title: 'Open Document…',
+          category: 'File',
+          subtitle: 'Search files and their contents',
+          shortcut: 'Ctrl+Shift+O',
+          run: _showQuickOpen),
+      PaletteAction(
           title: 'Save', category: 'File', shortcut: 'Ctrl+S', run: _save),
       PaletteAction(
           title: 'Save As…',
           category: 'File',
           shortcut: 'Ctrl+Shift+S',
+          searchOnly: true,
           run: _saveAs),
-      PaletteAction(
-          title: 'Open Document…',
-          category: 'File',
-          shortcut: 'Ctrl+Shift+O',
-          run: _showQuickOpen),
       PaletteAction(
           title: 'Switch to Previous Document',
           category: 'File',
           shortcut: 'Ctrl+Tab',
+          searchOnly: true,
           run: _switchToPrevious),
       PaletteAction(
-          title: 'Export as HTML…', category: 'File', run: _exportHtml),
+          title: 'Export as HTML…',
+          category: 'File',
+          searchOnly: true,
+          run: _exportHtml),
       PaletteAction(
           title: 'Find…',
           category: 'Edit',
@@ -1232,6 +1357,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           title: 'Find and Replace…',
           category: 'Edit',
           shortcut: 'Ctrl+H',
+          searchOnly: true,
           run: () => _openFind(replace: true)),
       PaletteAction(
           title: 'Copy as Rich Text',
@@ -1249,70 +1375,26 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           shortcut: 'Ctrl+Shift+F',
           checked: _controller.focusMode,
           run: _toggleFocusMode),
-      for (final mode in MarkdownViewMode.values)
-        PaletteAction(
-            title: 'View: ${mode.label}',
-            category: 'View',
-            shortcut: 'Ctrl+Shift+H',
-            checked: _controller.viewMode == mode,
-            run: () => _setViewMode(mode)),
       PaletteAction(
-          title: 'Zoom In',
+          title: 'View Mode…',
           category: 'View',
-          shortcut: 'Ctrl+=',
-          run: () => _zoom(1)),
+          subtitle: _controller.viewMode.label,
+          shortcut: 'Ctrl+Shift+H',
+          run: () => _openSub(_viewModeActions)),
       PaletteAction(
-          title: 'Zoom Out',
-          category: 'View',
-          shortcut: 'Ctrl+-',
-          run: () => _zoom(-1)),
-      PaletteAction(
-          title: 'Reset Zoom',
-          category: 'View',
-          shortcut: 'Ctrl+0',
-          run: _zoomReset),
-      PaletteAction(
-          title: 'Toggle Autosave',
-          category: 'File',
-          checked: settings.autosave,
-          run: () => settings.setAutosave(!settings.autosave)),
-      PaletteAction(
-          title: 'Toggle Smart Typography',
-          category: 'Edit',
-          subtitle: 'Curly quotes and — from --',
-          checked: settings.smartTypography,
-          run: () => settings.setSmartTypography(!settings.smartTypography)),
-      for (final (label, value) in [
-        ('Tight', 1.6),
-        ('Normal', 1.85),
-        ('Relaxed', 2.1)
-      ])
-        PaletteAction(
-          title: 'Line Height: $label',
-          category: 'View',
-          checked: settings.lineHeight == value,
-          run: () => settings.setLineHeight(value),
-        ),
-      PaletteAction(
-          title: 'Choose Sidebar Folder…',
-          category: 'File',
-          run: _pickSidebarRoot),
-      for (final mode in ThemeMode.values)
-        PaletteAction(
-          title:
-              'Appearance: ${mode.name[0].toUpperCase()}${mode.name.substring(1)}',
-          category: 'View',
-          checked: settings.themeMode == mode,
-          run: () => settings.setThemeMode(mode),
-        ),
-      for (final entry in kAccents.entries)
-        PaletteAction(
-          title: 'Accent: ${entry.value.name}',
-          category: 'View',
-          checked: settings.accent == entry.key,
-          run: () => settings.setAccent(entry.key),
-        ),
-      for (final recent in settings.recentFiles)
+          title: 'Settings…',
+          category: 'App',
+          subtitle:
+              '${kAccents[settings.accent]?.name} · ${_cap(settings.themeMode.name)}'
+              '${settings.autosave ? ' · Autosave' : ''}',
+          run: () => _openSub(_settingsActions)),
+      // Hidden leaves: found by search, not shown while browsing.
+      ..._viewModeActions(searchOnly: true),
+      ..._settingsActions(searchOnly: true),
+      ..._appearanceActions(searchOnly: true),
+      ..._accentActions(searchOnly: true),
+      ..._lineHeightActions(searchOnly: true),
+      for (final recent in settings.recentFiles.take(5))
         PaletteAction(
           title: p.basenameWithoutExtension(recent),
           subtitle: recent,
@@ -1320,7 +1402,6 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           run: () => _openPath(recent),
         ),
     ];
-    showCommandPalette(context, _palette, actions);
   }
 
   // ---- UI ----------------------------------------------------------------
