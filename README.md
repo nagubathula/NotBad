@@ -61,7 +61,8 @@ A full video walkthrough lives at [.github/assets/demo.mp4](.github/assets/demo.
 | Path | What it is |
 |---|---|
 | [`notbad-flutter/`](notbad-flutter/) | The Flutter app (all source, tests, and platform runners) |
-| [`notbad-flutter/installer/`](notbad-flutter/installer/) | Windows per-user installer / uninstaller scripts |
+| [`notbad-flutter/installer/`](notbad-flutter/installer/) | Windows installer: Inno Setup script + per-user PowerShell scripts |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | UI/UX & product design case study — tokens, diagrams, decision log |
 | [`.github/workflows/`](.github/workflows/) | CI: analyze + test, then release builds for Windows/Linux/macOS |
 
 ## Building
