@@ -31,11 +31,23 @@ void main() {
     expect(find.textContaining('5 words'), findsOneWidget);
   });
 
+  testWidgets('welcome screen shows on a fresh launch and clears on typing',
+      (tester) async {
+    await tester.pumpWidget(NotBadApp(settings: AppSettings()));
+    await tester.pumpAndSettle();
+    expect(find.text('NotBad'), findsOneWidget);
+    expect(find.text('New Document'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pumpAndSettle();
+    expect(find.text('New Document'), findsNothing);
+  });
+
   testWidgets('all three view modes render without altering text',
       (tester) async {
     await tester.pumpWidget(NotBadApp(settings: AppSettings()));
     await tester.pumpAndSettle();
-    const source = '# Hi\n\n**bold** `c` [l](u)\n- item';
+    const source =
+        '---\ntitle: test\n---\n# Hi\n\n**bold** `c` [l](u)\n- item';
     await tester.enterText(find.byType(TextField), source);
     await tester.pumpAndSettle();
     final controller = tester.widget<TextField>(find.byType(TextField)).controller

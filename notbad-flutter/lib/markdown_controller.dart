@@ -182,6 +182,18 @@ class MarkdownEditingController extends TextEditingController {
 
     if (_lineCache.length > 6000) _lineCache.clear();
 
+    // YAML frontmatter at the top of the document renders as a quiet
+    // mono block (Trace tucks it into a Properties chip).
+    var frontmatterEnd = -1;
+    if (lines.isNotEmpty && lines[0].trim() == '---') {
+      for (var i = 1; i < lines.length && i <= 50; i++) {
+        if (lines[i].trim() == '---') {
+          frontmatterEnd = i;
+          break;
+        }
+      }
+    }
+
     final children = <InlineSpan>[];
     var inFence = false;
     for (var i = 0; i < lines.length; i++) {
@@ -194,14 +206,27 @@ class MarkdownEditingController extends TextEditingController {
         );
       }
       final onCaretLine = caretLines.contains(i);
-      final isFenceLine = _fenceRe.hasMatch(line);
+      final inFrontmatter = frontmatterEnd != -1 && i <= frontmatterEnd;
+      final isFenceLine = !inFrontmatter && _fenceRe.hasMatch(line);
       final fenced = isFenceLine || inFence;
 
-      final key =
-          '${base.fontSize}|$dimmed|$onCaretLine|$fenced|$isFenceLine|$line';
+      final key = '${base.fontSize}|$dimmed|$onCaretLine|$fenced|'
+          '$isFenceLine|$inFrontmatter|$line';
       var spans = _lineCache[key];
       if (spans == null) {
-        if (fenced) {
+        if (inFrontmatter) {
+          spans = [
+            TextSpan(
+              text: line,
+              style: lineBase.copyWith(
+                fontFamily: 'Consolas',
+                fontFamilyFallback: kMonoFallback,
+                fontSize: (lineBase.fontSize ?? 16) - 2.5,
+                color: dimmed ? lineBase.color : _palette.muted,
+              ),
+            ),
+          ];
+        } else if (fenced) {
           spans = [
             TextSpan(
               text: line,
@@ -222,7 +247,13 @@ class MarkdownEditingController extends TextEditingController {
       children.addAll(spans);
       if (isFenceLine) inFence = !inFence;
       if (i < lines.length - 1) {
-        children.add(TextSpan(text: '\n', style: lineBase));
+        // Blank lines get a taller line box — paragraph breathing room.
+        final tall = line.trim().isEmpty && !fenced;
+        children.add(TextSpan(
+            text: '\n',
+            style: tall
+                ? lineBase.copyWith(height: (lineBase.height ?? 1.85) * 1.25)
+                : lineBase));
       }
     }
     return _applySearchHighlight(TextSpan(style: base, children: children));

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -8,14 +9,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'command_palette.dart';
 import 'markdown_controller.dart';
+import 'quick_open.dart';
 import 'settings.dart';
 import 'sidebar.dart';
 import 'theme.dart';
+
+const kAppVersion = '1.0.0';
+const kUpdateRepo = 'billjotorg/NotBad';
+
+/// Hook the single-instance server uses to hand a file path (or an empty
+/// string, meaning "just focus") to the running editor.
+void Function(String path)? onExternalOpen;
 
 const _kFileTypes = XTypeGroup(
   label: 'Markdown',
@@ -62,6 +72,13 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   var _matchIndex = -1;
 
   Timer? _autosaveTimer;
+  DateTime? _fileMtime;
+  File? _draftFile;
+  var _editorWidth = 700.0;
+  var _welcomeDismissed = false;
+  var _externalDialogOpen = false;
+
+  bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   TracePalette get _palette =>
       TracePalette.of(Theme.of(context).brightness, widget.settings.accent);
@@ -78,11 +95,185 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     _controller.addListener(_onTextChanged);
     _updateWindowTitle();
     _initWindow();
+    onExternalOpen = _handleExternalOpen;
     _autosaveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (widget.settings.autosave && _dirty && _path != null) _save();
+      _stashDraft();
+      _checkExternalChange();
     });
     if (widget.initialFile != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSession());
+    }
+    _initDraft();
+    _checkForUpdates();
+  }
+
+  void _handleExternalOpen(String path) async {
+    try {
+      await windowManager.show();
+      await windowManager.focus();
+    } catch (_) {}
+    if (path.isNotEmpty && File(path).existsSync()) {
+      _openPath(path);
+    }
+  }
+
+  // ---- Untitled draft protection -----------------------------------------
+
+  /// Untitled text is continuously stashed so a crash never loses it.
+  Future<void> _initDraft() async {
+    if (_isTest) return;
+    try {
+      final dir = await getApplicationSupportDirectory();
+      _draftFile = File(p.join(dir.path, 'draft.md'));
+      if (widget.initialFile == null &&
+          _draftFile!.existsSync() &&
+          _controller.text.isEmpty) {
+        final draft = await _draftFile!.readAsString();
+        if (draft.trim().isNotEmpty && mounted) {
+          setState(() {
+            _controller.value = TextEditingValue(
+              text: draft.replaceAll('\r\n', '\n'),
+              selection: TextSelection.collapsed(offset: draft.length),
+            );
+            _lastText = _controller.text;
+            _dirty = true;
+            _welcomeDismissed = true;
+          });
+          _updateWindowTitle();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _stashDraft() {
+    if (_draftFile == null) return;
+    try {
+      if (_path == null && _controller.text.trim().isNotEmpty) {
+        _draftFile!.writeAsStringSync(_controller.text);
+      } else if (_draftFile!.existsSync()) {
+        _draftFile!.deleteSync();
+      }
+    } catch (_) {}
+  }
+
+  // ---- External change detection -----------------------------------------
+
+  DateTime? _mtimeOf(String path) {
+    try {
+      return File(path).lastModifiedSync();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// If the open file changed on disk (another app, sync, git), reload it —
+  /// silently when we have no local edits, with a choice when we do.
+  Future<void> _checkExternalChange() async {
+    if (_path == null || _externalDialogOpen) return;
+    final mtime = _mtimeOf(_path!);
+    if (mtime == null || _fileMtime == null || !mtime.isAfter(_fileMtime!)) {
+      return;
+    }
+    String raw;
+    try {
+      raw = await File(_path!).readAsString();
+    } catch (_) {
+      return;
+    }
+    final text = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    _fileMtime = mtime;
+    if (text == _controller.text) return;
+
+    if (!_dirty) {
+      final caret = _controller.selection.isValid
+          ? _controller.selection.start.clamp(0, text.length)
+          : 0;
+      setState(() {
+        _savedText = text;
+        _lastText = text;
+        _controller.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: caret),
+        );
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(seconds: 2),
+            content: Text('$_docName changed on disk — reloaded')));
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    _externalDialogOpen = true;
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('“$_docName” changed on disk'),
+        content: const Text(
+            'The file was modified outside NotBad while you have unsaved '
+            'changes here.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'keep'),
+              child: const Text('Keep My Version')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, 'reload'),
+              child: const Text('Reload From Disk')),
+        ],
+      ),
+    );
+    _externalDialogOpen = false;
+    if (choice == 'reload') {
+      setState(() {
+        _savedText = text;
+        _lastText = text;
+        _dirty = false;
+        _controller.value = TextEditingValue(
+          text: text,
+          selection: const TextSelection.collapsed(offset: 0),
+        );
+      });
+      _updateWindowTitle();
+    }
+    // "Keep": _fileMtime already advanced, so the next save wins quietly.
+  }
+
+  // ---- Update check ------------------------------------------------------
+
+  Future<void> _checkForUpdates() async {
+    if (_isTest) return;
+    final today = DateTime.now().difference(DateTime(2020)).inDays;
+    if (widget.settings.lastUpdateCheckDay == today) return;
+    widget.settings.setLastUpdateCheckDay(today);
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(
+          Uri.parse('https://api.github.com/repos/$kUpdateRepo/releases/latest'));
+      request.headers.set('Accept', 'application/vnd.github+json');
+      final response = await request.close();
+      if (response.statusCode != 200) return;
+      final body = await response.transform(utf8.decoder).join();
+      final tag = (jsonDecode(body) as Map<String, dynamic>)['tag_name']
+          as String?;
+      if (tag == null) return;
+      final latest = tag.replaceFirst(RegExp('^v'), '');
+      if (latest != kAppVersion && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 6),
+          content: Text('NotBad $latest is available'),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => _openLink(
+                'https://github.com/$kUpdateRepo/releases/latest'),
+          ),
+        ));
+      }
+    } catch (_) {
+      // Offline or no releases yet — stay quiet.
     }
   }
 
@@ -117,6 +308,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
 
   @override
   void dispose() {
+    if (onExternalOpen == _handleExternalOpen) onExternalOpen = null;
     try {
       windowManager.removeListener(this);
     } catch (_) {}
@@ -147,6 +339,12 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   @override
   void onWindowBlur() {
     if (widget.settings.autosave && _dirty && _path != null) _save();
+    _stashDraft();
+  }
+
+  @override
+  void onWindowFocus() {
+    _checkExternalChange();
   }
 
   @override
@@ -172,6 +370,10 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       // The toolbar recedes while you type and returns on mouse movement.
       if (_toolbarVisible) setState(() => _toolbarVisible = false);
       if (_findVisible) _updateMatches();
+      _typewriterScroll();
+      if (!_welcomeDismissed && _controller.text.isNotEmpty) {
+        setState(() => _welcomeDismissed = true);
+      }
     }
     final dirty = _controller.text != _savedText;
     final words = _kWordRe.allMatches(_controller.text).length;
@@ -265,9 +467,12 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           selection: const TextSelection.collapsed(offset: 0),
         );
         _toolbarVisible = true;
+        _welcomeDismissed = true;
       });
+      _fileMtime = _mtimeOf(path);
       widget.settings.addRecent(path);
       widget.settings.setSession(path, 0);
+      _stashDraft();
       _editorFocus.requestFocus();
       _updateWindowTitle();
     } catch (e) {
@@ -283,6 +488,8 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     await File(_path!).writeAsString(_lineEnding == '\n'
         ? _controller.text
         : _controller.text.replaceAll('\n', _lineEnding));
+    _fileMtime = _mtimeOf(_path!);
+    _stashDraft();
     widget.settings.addRecent(_path!);
     widget.settings.setSession(
         _path, _controller.selection.isValid ? _controller.selection.start : 0);
@@ -605,7 +812,102 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       );
       return KeyEventResult.handled;
     }
+
+    // Smart typography (optional): curly quotes and -- → em dash.
+    if (widget.settings.smartTypography) {
+      final prev = sel.start > 0 ? text[sel.start - 1] : '';
+      if (ch == '-' && prev == '-') {
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(sel.start - 1, sel.start, '—'),
+          selection: TextSelection.collapsed(offset: sel.start),
+        );
+        return KeyEventResult.handled;
+      }
+      if (ch == '"' || ch == "'") {
+        final opens =
+            prev.isEmpty || RegExp(r'[\s(\[{—–\-]').hasMatch(prev);
+        final curly = ch == '"'
+            ? (opens ? '“' : '”')
+            : (opens ? '‘' : '’');
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(sel.start, sel.start, curly),
+          selection: TextSelection.collapsed(offset: sel.start + 1),
+        );
+        return KeyEventResult.handled;
+      }
+    }
     return KeyEventResult.ignored;
+  }
+
+  // ---- Document switching, quick open, export ----------------------------
+
+  /// Ctrl+Tab: jump back to the previously open document (MRU toggle).
+  void _switchToPrevious() {
+    for (final recent in widget.settings.recentFiles) {
+      if (recent != _path && File(recent).existsSync()) {
+        _openPath(recent);
+        return;
+      }
+    }
+  }
+
+  void _showQuickOpen() {
+    final root = _sidebarRoot;
+    if (root == null && widget.settings.recentFiles.isEmpty) {
+      _openDialog();
+      return;
+    }
+    showQuickOpen(
+      context,
+      _palette,
+      root ?? p.dirname(widget.settings.recentFiles.first),
+      widget.settings.recentFiles,
+      (path, offset) async {
+        await _openPath(path);
+        if (offset != null && _path == path) {
+          final caret = offset.clamp(0, _controller.text.length);
+          _controller.selection = TextSelection.collapsed(offset: caret);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToOffset(caret);
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _exportHtml() async {
+    final location = await getSaveLocation(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'HTML', extensions: ['html'])
+      ],
+      suggestedName:
+          '${_path == null ? 'Untitled' : p.basenameWithoutExtension(_path!)}.html',
+    );
+    if (location == null) return;
+    final body = md.markdownToHtml(_controller.text,
+        extensionSet: md.ExtensionSet.gitHubFlavored);
+    final title = const HtmlEscape().convert(_docName);
+    final html = '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>$title</title><style>'
+        'body{max-width:720px;margin:3rem auto;padding:0 1.5rem;'
+        'font:16px/1.7 -apple-system,"Segoe UI",Roboto,sans-serif;'
+        'color:#2c2c2b;background:#fdfdfc}'
+        'h1,h2,h3{line-height:1.3}a{color:#0969da}'
+        'code{background:#f0efec;padding:.15em .35em;border-radius:4px;'
+        'font-size:.9em}pre{background:#f0efec;padding:1em;border-radius:8px;'
+        'overflow-x:auto}pre code{background:none;padding:0}'
+        'blockquote{border-left:3px solid #d0cfcb;margin-left:0;'
+        'padding-left:1em;color:#6b6a66}'
+        'table{border-collapse:collapse}td,th{border:1px solid #d0cfcb;'
+        'padding:.35em .7em}img{max-width:100%}'
+        '</style></head><body>$body</body></html>';
+    await File(location.path).writeAsString(html);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 2),
+          content: Text('Exported to ${p.basename(location.path)}')));
+    }
   }
 
   // ---- Click interactions ------------------------------------------------
@@ -775,16 +1077,61 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     }
   }
 
-  void _scrollToOffset(int offset) {
-    if (_scroll.hasClients && _controller.text.isNotEmpty) {
-      final fraction = offset / _controller.text.length;
-      _scroll.animateTo(
-        (_scroll.position.maxScrollExtent * fraction)
-            .clamp(0, _scroll.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
+  TextStyle get _editorTextStyle => TextStyle(
+        fontSize: widget.settings.editorFontSize,
+        height: widget.settings.lineHeight,
+        letterSpacing: 0.1,
       );
+
+  /// Exact vertical position of [offset], measured by laying the text out at
+  /// the editor's real width. Falls back to null for very large documents.
+  double? _caretYFor(int offset) {
+    final text = _controller.text;
+    if (text.length > 200000) return null;
+    try {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: _editorTextStyle),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: _editorWidth);
+      final y = painter
+          .getOffsetForCaret(TextPosition(offset: offset), Rect.zero)
+          .dy;
+      painter.dispose();
+      return y;
+    } catch (_) {
+      return null;
     }
+  }
+
+  void _scrollToOffset(int offset, {bool animate = true, double align = 0.35}) {
+    if (!_scroll.hasClients || _controller.text.isEmpty) return;
+    final max = _scroll.position.maxScrollExtent;
+    final viewport = _scroll.position.viewportDimension;
+    final y = _caretYFor(offset);
+    final double target;
+    if (y != null) {
+      target = (y + _kTitleBarHeight + 14 - viewport * align).clamp(0.0, max);
+    } else {
+      target = (max * (offset / _controller.text.length)).clamp(0.0, max);
+    }
+    if (animate) {
+      _scroll.animateTo(target,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic);
+    } else {
+      _scroll.jumpTo(target);
+    }
+  }
+
+  /// Typewriter scrolling: in focus mode the caret line stays vertically
+  /// centered — the text moves, you don't.
+  void _typewriterScroll() {
+    if (!_controller.focusMode || !_controller.selection.isValid) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scrollToOffset(_controller.selection.start,
+          animate: false, align: 0.5);
+    });
   }
 
   // ---- Copy as Rich Text -------------------------------------------------
@@ -865,6 +1212,18 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           shortcut: 'Ctrl+Shift+S',
           run: _saveAs),
       PaletteAction(
+          title: 'Open Document…',
+          category: 'File',
+          shortcut: 'Ctrl+Shift+O',
+          run: _showQuickOpen),
+      PaletteAction(
+          title: 'Switch to Previous Document',
+          category: 'File',
+          shortcut: 'Ctrl+Tab',
+          run: _switchToPrevious),
+      PaletteAction(
+          title: 'Export as HTML…', category: 'File', run: _exportHtml),
+      PaletteAction(
           title: 'Find…',
           category: 'Edit',
           shortcut: 'Ctrl+F',
@@ -918,6 +1277,23 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           checked: settings.autosave,
           run: () => settings.setAutosave(!settings.autosave)),
       PaletteAction(
+          title: 'Toggle Smart Typography',
+          category: 'Edit',
+          subtitle: 'Curly quotes and — from --',
+          checked: settings.smartTypography,
+          run: () => settings.setSmartTypography(!settings.smartTypography)),
+      for (final (label, value) in [
+        ('Tight', 1.6),
+        ('Normal', 1.85),
+        ('Relaxed', 2.1)
+      ])
+        PaletteAction(
+          title: 'Line Height: $label',
+          category: 'View',
+          checked: settings.lineHeight == value,
+          run: () => settings.setLineHeight(value),
+        ),
+      PaletteAction(
           title: 'Choose Sidebar Folder…',
           category: 'File',
           run: _pickSidebarRoot),
@@ -968,6 +1344,10 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
             control: !meta, meta: meta, shift: true): _saveAs,
         SingleActivator(LogicalKeyboardKey.keyO, control: !meta, meta: meta):
             _openDialog,
+        SingleActivator(LogicalKeyboardKey.keyO,
+            control: !meta, meta: meta, shift: true): _showQuickOpen,
+        SingleActivator(LogicalKeyboardKey.tab, control: !meta, meta: meta):
+            _switchToPrevious,
         SingleActivator(LogicalKeyboardKey.keyN, control: !meta, meta: meta):
             _newDocument,
         SingleActivator(LogicalKeyboardKey.keyF, control: !meta, meta: meta):
@@ -1053,6 +1433,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
                       child: Stack(
                         children: [
                           _buildEditor(palette),
+                          if (_showWelcome) _buildWelcome(palette),
                           Positioned(
                             top: _kTitleBarHeight + 10,
                             left: 20,
@@ -1289,6 +1670,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           if (showWindowButtons) ...[
             _WindowButton(
               icon: Icons.remove,
+              label: 'Minimize',
               palette: palette,
               onPressed: () async {
                 try {
@@ -1299,11 +1681,13 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
             _WindowButton(
               icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
               iconSize: _isMaximized ? 12 : 14,
+              label: _isMaximized ? 'Restore' : 'Maximize',
               palette: palette,
               onPressed: _toggleMaximize,
             ),
             _WindowButton(
               icon: Icons.close,
+              label: 'Close',
               palette: palette,
               isClose: true,
               onPressed: () async {
@@ -1324,36 +1708,111 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
         constraints: const BoxConstraints(maxWidth: 820),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 56),
-          child: Focus(
-            onKeyEvent: _onEditorKey,
-            child: TextField(
-              controller: _controller,
-              focusNode: _editorFocus,
-              scrollController: _scroll,
-              maxLines: null,
-              expands: true,
-              autofocus: true,
-              textAlignVertical: TextAlignVertical.top,
-              onTap: _handleEditorTap,
-              cursorColor: palette.accent,
-              cursorWidth: 2,
-              cursorRadius: const Radius.circular(1),
-              style: TextStyle(
-                color: palette.fg,
-                fontSize: widget.settings.editorFontSize,
-                height: 1.85,
-                letterSpacing: 0.1,
-              ),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'A quiet place to write.   ·   Ctrl+K for commands',
-                hintStyle: TextStyle(color: palette.muted),
-                contentPadding: const EdgeInsets.only(
-                    top: _kTitleBarHeight + 14, bottom: 90),
-              ),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _editorWidth = constraints.maxWidth;
+              return Focus(
+                onKeyEvent: _onEditorKey,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _editorFocus,
+                  scrollController: _scroll,
+                  maxLines: null,
+                  expands: true,
+                  autofocus: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  onTap: _handleEditorTap,
+                  cursorColor: palette.accent,
+                  cursorWidth: 2,
+                  cursorRadius: const Radius.circular(1),
+                  style: _editorTextStyle.copyWith(color: palette.fg),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: _showWelcome
+                        ? null
+                        : 'A quiet place to write.   ·   Ctrl+K for commands',
+                    hintStyle: TextStyle(color: palette.muted),
+                    contentPadding: const EdgeInsets.only(
+                        top: _kTitleBarHeight + 14, bottom: 90),
+                  ),
+                ),
+              );
+            },
           ),
         ),
+      ),
+    );
+  }
+
+  bool get _showWelcome =>
+      _path == null && _controller.text.isEmpty && !_welcomeDismissed;
+
+  /// A welcome, not a blank stare: recent files and New/Open on a fresh
+  /// launch, gone the moment you type.
+  Widget _buildWelcome(TracePalette palette) {
+    final recents = [
+      for (final r in widget.settings.recentFiles.take(5))
+        if (File(r).existsSync()) r,
+    ];
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('NotBad',
+              style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: palette.fg.withValues(alpha: 0.85))),
+          const SizedBox(height: 4),
+          Text('A quiet place to write.',
+              style: TextStyle(fontSize: 14, color: palette.muted)),
+          const SizedBox(height: 22),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton.tonal(
+                onPressed: () {
+                  setState(() => _welcomeDismissed = true);
+                  _editorFocus.requestFocus();
+                },
+                child: const Text('New Document'),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: _openDialog,
+                child: const Text('Open…'),
+              ),
+            ],
+          ),
+          if (recents.isNotEmpty) ...[
+            const SizedBox(height: 26),
+            Text('RECENT',
+                style: TextStyle(
+                    fontSize: 10.5,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w600,
+                    color: palette.muted)),
+            const SizedBox(height: 6),
+            for (final r in recents)
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => _openPath(r),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  child: Text(
+                    p.basenameWithoutExtension(r),
+                    style: TextStyle(fontSize: 13.5, color: palette.accent),
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 18),
+          Text('Ctrl+K for everything else',
+              style: TextStyle(
+                  fontSize: 11.5,
+                  color: palette.muted.withValues(alpha: 0.8))),
+        ],
       ),
     );
   }
@@ -1475,12 +1934,14 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
 class _WindowButton extends StatefulWidget {
   final IconData icon;
   final double iconSize;
+  final String label;
   final TracePalette palette;
   final bool isClose;
   final VoidCallback onPressed;
 
   const _WindowButton({
     required this.icon,
+    required this.label,
     required this.palette,
     required this.onPressed,
     this.iconSize = 15,
@@ -1503,17 +1964,20 @@ class _WindowButtonState extends State<_WindowButton> {
     final iconColor = _hovering && widget.isClose
         ? Colors.white
         : palette.muted.withValues(alpha: _hovering ? 1 : 0.7);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onPressed,
-        child: Container(
-          width: 44,
-          height: _kTitleBarHeight,
-          color: _hovering ? hoverBg : Colors.transparent,
-          child: Icon(widget.icon, size: widget.iconSize, color: iconColor),
+    return Tooltip(
+      message: widget.label,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovering = true),
+        onExit: (_) => setState(() => _hovering = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onPressed,
+          child: Container(
+            width: 44,
+            height: _kTitleBarHeight,
+            color: _hovering ? hoverBg : Colors.transparent,
+            child: Icon(widget.icon, size: widget.iconSize, color: iconColor),
+          ),
         ),
       ),
     );

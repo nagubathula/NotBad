@@ -17,6 +17,9 @@ class AppSettings extends ChangeNotifier {
   int lastCaret = 0;
   bool autosave = true;
   double editorFontSize = 15.5;
+  double lineHeight = 1.85;
+  bool smartTypography = false;
+  int lastUpdateCheckDay = 0;
 
   File? _file;
 
@@ -42,6 +45,9 @@ class AppSettings extends ChangeNotifier {
         settings.autosave = data['autosave'] as bool? ?? true;
         settings.editorFontSize =
             (data['editorFontSize'] as num?)?.toDouble() ?? 15.5;
+        settings.lineHeight = (data['lineHeight'] as num?)?.toDouble() ?? 1.85;
+        settings.smartTypography = data['smartTypography'] as bool? ?? false;
+        settings.lastUpdateCheckDay = data['lastUpdateCheckDay'] as int? ?? 0;
       }
     } catch (_) {
       // Missing/corrupt settings are non-fatal; start with defaults.
@@ -61,6 +67,9 @@ class AppSettings extends ChangeNotifier {
         'lastCaret': lastCaret,
         'autosave': autosave,
         'editorFontSize': editorFontSize,
+        'lineHeight': lineHeight,
+        'smartTypography': smartTypography,
+        'lastUpdateCheckDay': lastUpdateCheckDay,
       }));
     } catch (_) {}
   }
@@ -98,6 +107,23 @@ class AppSettings extends ChangeNotifier {
   void setEditorFontSize(double size) {
     editorFontSize = size.clamp(11.0, 28.0);
     notifyListeners();
+    _save();
+  }
+
+  void setLineHeight(double height) {
+    lineHeight = height;
+    notifyListeners();
+    _save();
+  }
+
+  void setSmartTypography(bool value) {
+    smartTypography = value;
+    notifyListeners();
+    _save();
+  }
+
+  void setLastUpdateCheckDay(int day) {
+    lastUpdateCheckDay = day;
     _save();
   }
 

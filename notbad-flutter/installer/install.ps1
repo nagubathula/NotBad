@@ -27,6 +27,8 @@ if (Get-Process notbad_flutter -ErrorAction SilentlyContinue |
 }
 New-Item -ItemType Directory -Force $destDir | Out-Null
 Copy-Item -Path (Join-Path $sourceDir '*') -Destination $destDir -Recurse -Force
+# Keep the uninstaller next to the app so "Installed apps" can call it.
+Copy-Item -Path (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $destDir -Force
 
 # --- Registry (per-user: HKCU\Software\Classes) ---------------------------
 $classes = 'HKCU:\Software\Classes'
@@ -55,6 +57,21 @@ foreach ($ext in $extensions) {
     New-ItemProperty -Path $openWith -Name 'NotBad.Document' `
         -PropertyType String -Value '' -Force | Out-Null
 }
+
+# --- "Installed apps" registration (Add/Remove Programs) ------------------
+$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NotBad'
+New-Item -Path $uninstallKey -Force | Out-Null
+$sizeKB = [int]((Get-ChildItem $destDir -Recurse | Measure-Object Length -Sum).Sum / 1KB)
+Set-ItemProperty -Path $uninstallKey -Name 'DisplayName' -Value 'NotBad'
+Set-ItemProperty -Path $uninstallKey -Name 'DisplayVersion' -Value '1.0.0'
+Set-ItemProperty -Path $uninstallKey -Name 'Publisher' -Value 'Nagubathula Satya Sai'
+Set-ItemProperty -Path $uninstallKey -Name 'DisplayIcon' -Value "$destExe,0"
+Set-ItemProperty -Path $uninstallKey -Name 'InstallLocation' -Value $destDir
+Set-ItemProperty -Path $uninstallKey -Name 'UninstallString' `
+    -Value "powershell.exe -ExecutionPolicy Bypass -File `"$destDir\uninstall.ps1`""
+Set-ItemProperty -Path $uninstallKey -Name 'NoModify' -Value 1 -Type DWord
+Set-ItemProperty -Path $uninstallKey -Name 'NoRepair' -Value 1 -Type DWord
+Set-ItemProperty -Path $uninstallKey -Name 'EstimatedSize' -Value $sizeKB -Type DWord
 
 # --- Start Menu shortcut --------------------------------------------------
 $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\NotBad.lnk'
