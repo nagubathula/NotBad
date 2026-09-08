@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NotBad — Design System & UI Element Visualizer</title>
+  <!-- Material Icons (Outlined & Filled) identical to Flutter Material Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+  <style>
+    /* =========================================================
+       CSS VARIABLES & THEME DEFINITIONS
+       Directly mirroring notbad-flutter/lib/theme.dart & DESIGN.md
+       ========================================================= */
+    :root {
+      /* Accents (Light defaults) */
+      --accent-amber: #9A6700;
+      --accent-crimson: #CF222E;
+      --accent-fern: #1A7F37;
+      --accent-teal: #0F766E;
+      --accent-azure: #0969DA;
+      --accent-graphite: #57606A;
+
+      /* Active Accent (default Azure) */
+      --accent: var(--accent-azure);
+      --accent-alpha-25: rgba(9, 105, 218, 0.25);
+      --accent-alpha-15: rgba(9, 105, 218, 0.15);
+      --accent-alpha-45: rgba(9, 105, 218, 0.45);
+
+      /* Surfaces & Text - Light Theme (Warm Paper) */
+      --bg: #F7F6F3;
+      --sidebar-bg: #EFEDE9;
+      --fg: #2C2C2B;
+      --muted: #8F8E8A;
+      --marks: rgba(44, 44, 43, 0.25);
+      --code-bg: #EBEAE6;
+      --border: #E2E1DD;
+      --toolbar-bg: #FFFFFF;
+      --shadow-color: rgba(0, 0, 0, 0.08);
+      --elevation-pill: 0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0,0,0,0.06);
+      --elevation-modal: 0 16px 36px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0,0,0,0.08);
+
+      /* Typography */
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: Consolas, Menlo, "DejaVu Sans Mono", "Courier New", monospace;
+      --line-height: 1.85;
+      --body-size: 15.5px;
+    }
+
+    /* Dark Theme */
+    [data-theme="dark"] {
+      --accent-amber: #D4A72C;
+      --accent-crimson: #F47067;
+      --accent-fern: #57AB5A;
+      --accent-teal: #2DD4BF;
+      --accent-azure: #4493F8;
+      --accent-graphite: #8B949E;
+
+      --bg: #2D2D2D;
+      --sidebar-bg: #252525;
+      --fg: #E6E5E2;
+      --muted: #98978F;
+      --marks: rgba(230, 229, 226, 0.28);
+      --code-bg: #383838;
+      --border: #454545;
+      --toolbar-bg: #3A3A3A;
+      --shadow-color: rgba(0, 0, 0, 0.35);
+      --elevation-pill: 0 4px 20px rgba(0, 0, 0, 0.45), 0 1px 4px rgba(0,0,0,0.3);
+      --elevation-modal: 0 20px 48px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--body-size);
+      line-height: 1.6;
+      transition: background-color 0.2s ease, color 0.2s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Material Icons standard styling */
+    .material-icons, .material-icons-outlined {
+      font-family: 'Material Icons Outlined', 'Material Icons';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 18px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+      vertical-align: middle;
+      user-select: none;
+    }
+
+    /* =========================================================
+       GLOBAL CONTROLS BAR (Top Header of visualizer)
+       ========================================================= */
+    header.spec-header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--code-bg);
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .segmented-control {
+      display: inline-flex;
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .segmented-control button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .segmented-control button.active {
+      background: var(--toolbar-bg);
+      color: var(--fg);
+      box-shadow: 0 1px 3px var(--shadow-color);
+    }
+
+    .color-swatches {
+      display: flex;
+      gap: 6px;
+    }
+
+    .swatch-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+      outline: none;
+    }
+
+    .swatch-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .swatch-btn.active {
+      border-color: var(--fg);
+      box-shadow: 0 0 0 2px var(--bg);
+    }
+
+    /* =========================================================
+       PAGE LAYOUT & NAVIGATION
+       ========================================================= */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 100px;
+    }
+
+    .section-nav {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 16px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-nav a {
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 8px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .section-nav a:hover,
+    .section-nav a.active {
+      color: var(--accent);
+      background: var(--accent-alpha-15);
+    }
+
+    section {
+      margin-bottom: 64px;
+      scroll-margin-top: 80px;
+    }
+
+    .section-header {
+      margin-bottom: 24px;
+    }
+
+    .section-header h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* Grid cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .token-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .token-row:last-child {
+      border-bottom: none;
+    }
+
+    .token-name {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .token-val {
+      font-family: var(--font-mono);
+      color: var(--muted);
+    }
+
+    /* =========================================================
+       SECTION: EXACT ICON SYSTEM SPECIFICATION
+       ========================================================= */
+    .icon-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-top: 8px;
+    }
+
+    .icon-table th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .icon-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .icon-preview-cell {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+    }
+
+    .icon-code-badge {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--fg);
+    }
+
+    /* =========================================================
+       SECTION: APP SHELL & CHROME
+       ========================================================= */
+    .app-window-frame {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 18px 48px var(--shadow-color);
+      display: flex;
+      flex-direction: column;
+      min-height: 640px;
+      position: relative;
+    }
+
+    /* Title bar */
+    .window-titlebar {
+      height: 36px;
+      background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px 0 10px;
+      user-select: none;
+      z-index: 20;
+    }
+
+    .titlebar-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-icon-subtle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      transition: color 0.15s ease, background 0.15s ease;
+      opacity: 0.75;
+    }
+
+    .btn-icon-subtle:hover {
+      opacity: 1;
+      color: var(--fg);
+      background: var(--code-bg);
+    }
+
+    .titlebar-center {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: var(--fg);
+      opacity: 0.75;
+      font-weight: 600;
+    }
+
+    .titlebar-dirty {
+      color: var(--muted);
+      font-weight: normal;
+    }
+
+    .titlebar-right {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .caption-controls {
+      display: flex;
+      align-items: center;
+    }
+
+    .caption-btn {
+      background: none;
+      border: none;
+      color: var(--fg);
+      opacity: 0.75;
+      width: 44px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .caption-btn:hover {
+      opacity: 1;
+      background: var(--code-bg);
+    }
+
+    .caption-btn.close:hover {
+      background: #E81123;
+      color: #FFF;
+      opacity: 1;
+    }
+
+    /* App Body */
+    .window-body {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .app-sidebar {
+      width: 230px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: margin-left 0.22s cubic-bezier(0.2, 0, 0, 1);
+      z-index: 10;
+    }
+
+    .app-sidebar.collapsed {
+      margin-left: -230px;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 36px;
+      padding: 0 8px 0 14px;
+      border-bottom: 1px solid transparent;
+    }
+
+    .sidebar-folder-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-tree {
+      display: flex;
+      flex-direction: column;
+      padding: 4px 8px 12px;
+      gap: 1px;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 6px;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      color: var(--fg);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .tree-row:hover {
+      background: rgba(128, 128, 128, 0.08);
+    }
+
+    .tree-row.active {
+      background: rgba(128, 128, 128, 0.09);
+      font-weight: 500;
+    }
+
+    .tree-row.keyboard-focused {
+      box-shadow: inset 0 0 0 1.5px var(--accent-alpha-45);
+    }
+
+    .tree-chevron {
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      margin-right: 3px;
+    }
+
+    .tree-folder-icon {
+      color: var(--muted);
+      margin-right: 6px;
+    }
+
+    .tree-file-indent {
+      width: 23px;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    /* Editor Canvas */
+    .app-editor-area {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: var(--bg);
+      padding: 24px 56px;
+    }
+
+    .editor-inner-content {
+      max-width: 780px;
+      width: 100%;
+      margin: 0 auto;
+      position: relative;
+      padding-bottom: 120px;
+    }
+
+    /* Hover TOC Dashes */
+    .toc-dashes-anchor {
+      position: absolute;
+      top: 10px;
+      left: 16px;
+      z-index: 15;
+    }
+
+    .toc-dashes-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+
+    .toc-dashes-preview:hover {
+      background: var(--code-bg);
+    }
+
+    .toc-dash {
+      height: 2.5px;
+      background: var(--muted);
+      opacity: 0.55;
+      border-radius: 2px;
+      transition: all 0.15s ease;
+    }
+
+    .toc-dash.h1 { width: 18px; }
+    .toc-dash.h2 { width: 14px; }
+    .toc-dash.h3 { width: 10px; }
+
+    .toc-popover {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 220px;
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--elevation-pill);
+      padding: 10px;
+      z-index: 30;
+    }
+
+    .toc-dashes-anchor:hover .toc-popover {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .toc-popover-item {
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toc-popover-item:hover {
+      background: var(--accent-alpha-15);
+      color: var(--accent);
+    }
+
+    .toc-popover-item.h2 { padding-left: 16px; }
+    .toc-popover-item.h3 { padding-left: 24px; }
+
+    /* Find & Replace Bar identical to editor_screen.dart */
+    .floating-find-bar {
+      position: absolute;
+      top: 14px;
+      right: 24px;
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px 8px;
+      box-shadow: var(--elevation-pill);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      z-index: 25;
+      font-size: 0.85rem;
+    }
+
+    .find-input {
+      border: none;
+      background: transparent;
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      outline: none;
+      width: 130px;
+      padding-left: 4px;
+    }
+
+    .find-counter {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      padding: 0 4px;
+    }
+
+    .find-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .find-btn:hover {
+      color: var(--fg);
+      background: var(--code-bg);
+    }
+
+    /* Floating Toolbar Pill identical to editor_screen.dart */
+    .floating-toolbar-pill {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 2px 8px;
+      box-shadow: var(--elevation-pill);
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      z-index: 25;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .pill-btn {
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .pill-btn:hover {
+      background: var(--code-bg);
+    }
+
+    .pill-btn.active {
+      color: var(--accent);
+      background: var(--accent-alpha-15);
+    }
+
+    .pill-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--border);
+      margin: 0 2px;
+    }
+
+    /* Word count popover over info button */
+    .stats-tooltip {
+      position: relative;
+    }
+
+    .stats-card {
+      position: absolute;
+      bottom: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      box-shadow: var(--elevation-pill);
+      white-space: nowrap;
+      font-size: 0.78rem;
+      color: var(--fg);
+      display: none;
+    }
+
+    .stats-tooltip:hover .stats-card {
+      display: block;
+    }
+
+    /* Markdown Elements */
+    .md-editor-view {
+      font-family: var(--font-body);
+      font-size: var(--body-size);
+      line-height: var(--line-height);
+    }
+
+    .simulated-caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.15em;
+      background-color: var(--accent);
+      vertical-align: text-bottom;
+      animation: blink 1s step-start infinite;
+      border-radius: 1px;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .md-h1 {
+      font-size: calc(var(--body-size) * 1.6);
+      font-weight: 700;
+      line-height: 1.3;
+      margin: 1.2em 0 0.4em;
+    }
+
+    .md-h2 {
+      font-size: calc(var(--body-size) * 1.35);
+      font-weight: 700;
+      line-height: 1.35;
+      margin: 1em 0 0.35em;
+    }
+
+    .md-p { margin-bottom: 0.9em; }
+
+    .md-quote {
+      border-left: 3px solid var(--muted);
+      padding-left: 14px;
+      color: var(--muted);
+      margin: 0.8em 0;
+      font-style: italic;
+    }
+
+    .md-code-fence {
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      line-height: 1.5;
+      margin: 1em 0;
+    }
+
+    .md-task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 0.3em;
+    }
+
+    .custom-checkbox {
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--muted);
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.65rem;
+      color: transparent;
+      user-select: none;
+    }
+
+    .custom-checkbox.checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #FFF;
+    }
+
+    .syntax-mark {
+      font-family: var(--font-mono);
+      color: var(--marks);
+      font-weight: normal;
+      transition: all 0.15s ease;
+    }
+
+    .view-mode-concealed .syntax-mark { display: none; }
+    .view-mode-concealed .active-caret-line .syntax-mark {
+      display: inline;
+      color: var(--marks);
+    }
+    .view-mode-marks .syntax-mark {
+      display: inline;
+      color: var(--marks);
+    }
+    .view-mode-plain {
+      font-family: var(--font-mono) !important;
+    }
+    .view-mode-plain * {
+      font-family: var(--font-mono) !important;
+      font-weight: normal !important;
+      color: var(--fg) !important;
+    }
+    .view-mode-plain .syntax-mark {
+      display: inline !important;
+    }
+
+    /* Command Palette Card */
+    .command-palette-card {
+      width: 580px;
+      max-width: 100%;
+      background: var(--toolbar-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--elevation-modal);
+      overflow: hidden;
+      margin: 0 auto;
+    }
+
+    .palette-search-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .palette-search-input {
+      border: none;
+      background: transparent;
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 1.05rem;
+      width: 100%;
+      outline: none;
+    }
+
+    .palette-list {
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .palette-section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      padding: 8px 12px 4px;
+    }
+
+    .palette-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+
+    .palette-item:hover,
+    .palette-item.selected {
+      background: var(--accent-alpha-15);
+      color: var(--accent);
+    }
+
+    .palette-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .palette-item-subtitle {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    .palette-shortcut {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--muted);
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .interactive-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-alpha-15);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <!-- =========================================================
+       VISUALIZER HEADER & GLOBAL CONTROLS
+       ========================================================= -->
+  <header class="spec-header">
+    <div class="brand-title">
+      <h1>NotBad Design System</h1>
+      <span class="brand-badge">UI/UX & Icon Spec</span>
+      <a href="casestudy.html" style="text-decoration: none; color: var(--accent); font-size: 0.82rem; font-weight: 600; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px;">
+        <span class="material-icons-outlined" style="font-size: 15px;">article</span>
+        Read Case Study
+      </a>
+    </div>
+
+    <div class="controls-group">
+      <!-- Theme Switcher -->
+      <div class="control-item">
+        <span>Appearance:</span>
+        <div class="segmented-control" id="theme-switch">
+          <button class="active" data-val="light">Light (Warm Paper)</button>
+          <button data-val="dark">Dark (Neutral Warm)</button>
+        </div>
+      </div>
+
+      <!-- Accent Switcher -->
+      <div class="control-item">
+        <span>Accent:</span>
+        <div class="color-swatches" id="accent-swatches">
+          <button class="swatch-btn" style="background:#9A6700" data-accent="amber" title="Amber"></button>
+          <button class="swatch-btn" style="background:#CF222E" data-accent="crimson" title="Crimson"></button>
+          <button class="swatch-btn" style="background:#1A7F37" data-accent="fern" title="Fern"></button>
+          <button class="swatch-btn" style="background:#0F766E" data-accent="teal" title="Teal"></button>
+          <button class="swatch-btn active" style="background:#0969DA" data-accent="azure" title="Azure (Default)"></button>
+          <button class="swatch-btn" style="background:#57606A" data-accent="graphite" title="Graphite"></button>
+        </div>
+      </div>
+
+      <!-- View Mode switcher for interactive editor -->
+      <div class="control-item">
+        <span>View Mode:</span>
+        <div class="segmented-control" id="view-mode-switch">
+          <button class="active" data-mode="concealed">Concealed</button>
+          <button data-mode="marks">Marks</button>
+          <button data-mode="plain">Plain</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Quick Navigation -->
+    <nav class="section-nav">
+      <a href="#icon-inventory" class="active">Icon System Inventory</a>
+      <a href="#full-app">App Shell & Chrome</a>
+      <a href="#editor-modes">Editor & Concealment</a>
+      <a href="#command-palette">Command Palette</a>
+      <a href="#tokens">Design Tokens</a>
+    </nav>
+
+    <!-- =========================================================
+         SECTION: EXACT ICON SYSTEM SPECIFICATION
+         ========================================================= -->
+    <section id="icon-inventory">
+      <div class="section-header">
+        <h2>1. Icon System Inventory</h2>
+        <p>NotBad adheres strictly to the principle of <em>"Quiet Chrome"</em> — using Material Icons with specific weights and semantic glyphs only where text cannot communicate faster. Here is the complete inventory from the Flutter source code:</p>
+      </div>
+
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table class="icon-table">
+          <thead>
+            <tr>
+              <th style="width: 60px;">Icon</th>
+              <th>Flutter Material Identifier</th>
+              <th>Component Location</th>
+              <th>Tooltip / Function</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:16px;">vertical_split</span></div></td>
+              <td><span class="icon-code-badge">Icons.vertical_split_outlined</span></td>
+              <td>Title Bar (Left)</td>
+              <td>Toggle Sidebar (Ctrl+\)</td>
+              <td>15px · 55% opacity</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:16px;">keyboard_command_key</span></div></td>
+              <td><span class="icon-code-badge">Icons.keyboard_command_key</span></td>
+              <td>Title Bar (Right)</td>
+              <td>Commands (Ctrl+K)</td>
+              <td>15px · 55% opacity</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">remove</span></div></td>
+              <td><span class="icon-code-badge">Icons.remove</span></td>
+              <td>Title Bar (Caption Controls)</td>
+              <td>Minimize</td>
+              <td>14px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">crop_square</span></div></td>
+              <td><span class="icon-code-badge">Icons.crop_square / filter_none</span></td>
+              <td>Title Bar (Caption Controls)</td>
+              <td>Maximize / Restore</td>
+              <td>14px / 12px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">close</span></div></td>
+              <td><span class="icon-code-badge">Icons.close</span></td>
+              <td>Title Bar (Caption Controls)</td>
+              <td>Close Window (Hover turns #E81123)</td>
+              <td>14px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:17px;">format_list_bulleted</span></div></td>
+              <td><span class="icon-code-badge">Icons.format_list_bulleted</span></td>
+              <td>Toolbar Pill (Button 4)</td>
+              <td>Toggle List Continuer</td>
+              <td>18px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:17px;">search</span></div></td>
+              <td><span class="icon-code-badge">Icons.search</span></td>
+              <td>Toolbar Pill (Button 5)</td>
+              <td>Find (Ctrl+F)</td>
+              <td>18px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:17px;">filter_center_focus</span></div></td>
+              <td><span class="icon-code-badge">Icons.filter_center_focus</span></td>
+              <td>Toolbar Pill (Button 7)</td>
+              <td>Focus mode (Ctrl+Shift+F)</td>
+              <td>18px (Target frame)</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:17px;">info_outline</span></div></td>
+              <td><span class="icon-code-badge">Icons.info_outline</span></td>
+              <td>Toolbar Pill (Button 8)</td>
+              <td>Document Statistics Popover</td>
+              <td>18px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">keyboard_arrow_up</span></div></td>
+              <td><span class="icon-code-badge">Icons.keyboard_arrow_up</span></td>
+              <td>Find Bar</td>
+              <td>Previous match (Shift+Enter)</td>
+              <td>16px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">keyboard_arrow_down</span></div></td>
+              <td><span class="icon-code-badge">Icons.keyboard_arrow_down</span></td>
+              <td>Find Bar & Sidebar Folders</td>
+              <td>Next match / Folder expanded</td>
+              <td>16px / 14px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">keyboard_arrow_right</span></div></td>
+              <td><span class="icon-code-badge">Icons.keyboard_arrow_right</span></td>
+              <td>Sidebar Folders</td>
+              <td>Folder collapsed</td>
+              <td>14px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">folder_outlined</span></div></td>
+              <td><span class="icon-code-badge">Icons.folder_outlined</span></td>
+              <td>Sidebar Folder Items</td>
+              <td>Folder container indicator</td>
+              <td>13px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">create_new_folder_outlined</span></div></td>
+              <td><span class="icon-code-badge">Icons.create_new_folder_outlined</span></td>
+              <td>Sidebar Header Action</td>
+              <td>Choose root folder…</td>
+              <td>15px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">find_replace</span></div></td>
+              <td><span class="icon-code-badge">Icons.find_replace_outlined</span></td>
+              <td>Find Bar</td>
+              <td>Toggle Replace mode</td>
+              <td>16px</td>
+            </tr>
+            <tr>
+              <td><div class="icon-preview-cell"><span class="material-icons-outlined" style="font-size:15px;">check</span></div></td>
+              <td><span class="icon-code-badge">Icons.check</span></td>
+              <td>Command Palette</td>
+              <td>Active state / Selection indicator</td>
+              <td>15px</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         SECTION: COMPLETE APP SHELL MOCKUP (INTERACTIVE)
+         ========================================================= -->
+    <section id="full-app">
+      <div class="section-header">
+        <h2>2. Live App Shell with Precise Flutter Icons</h2>
+        <p>This interactive specimen matches the exact visual density, icon sizes, and component behaviors of <code>editor_screen.dart</code> and <code>sidebar.dart</code>.</p>
+      </div>
+
+      <div class="interactive-badge">
+        ✨ Interactive Specimen: Notice the exact Material Icons in the title bar, sidebar, find bar, and bottom pill!
+      </div>
+
+      <!-- App Window Mockup -->
+      <div class="app-window-frame">
+        <!-- Title bar -->
+        <div class="window-titlebar">
+          <div class="titlebar-left">
+            <button class="btn-icon-subtle" id="toggle-sidebar-btn" title="Sidebar (Ctrl+\)">
+              <span class="material-icons-outlined" style="font-size: 16px;">vertical_split</span>
+            </button>
+          </div>
+
+          <div class="titlebar-center">
+            <span>Chapter-03-The-Beginning.md</span>
+            <span class="titlebar-dirty">— Edited</span>
+          </div>
+
+          <div class="titlebar-right">
+            <button class="btn-icon-subtle" title="Commands (Ctrl+K)" onclick="document.getElementById('command-palette').scrollIntoView({behavior:'smooth'})">
+              <span class="material-icons-outlined" style="font-size: 16px;">keyboard_command_key</span>
+            </button>
+            <div class="caption-controls">
+              <button class="caption-btn" title="Minimize">
+                <span class="material-icons-outlined" style="font-size: 14px;">remove</span>
+              </button>
+              <button class="caption-btn" title="Maximize">
+                <span class="material-icons-outlined" style="font-size: 13px;">crop_square</span>
+              </button>
+              <button class="caption-btn close" title="Close">
+                <span class="material-icons-outlined" style="font-size: 14px;">close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- App Body -->
+        <div class="window-body">
+          <!-- Sidebar -->
+          <div class="app-sidebar" id="spec-sidebar">
+            <div class="sidebar-header">
+              <span class="sidebar-folder-title">Manuscript</span>
+              <button class="btn-icon-subtle" style="width:26px; height:26px;" title="Choose folder…">
+                <span class="material-icons-outlined" style="font-size: 15px;">create_new_folder</span>
+              </button>
+            </div>
+            <div class="file-tree">
+              <!-- Folder 1: expanded -->
+              <div class="tree-row">
+                <span class="tree-chevron"><span class="material-icons-outlined" style="font-size: 14px;">keyboard_arrow_down</span></span>
+                <span class="tree-folder-icon"><span class="material-icons-outlined" style="font-size: 13px;">folder</span></span>
+                <span style="font-weight: 500;">Chapters</span>
+              </div>
+              <!-- Files: NO icon, stripped extensions per design philosophy! -->
+              <div class="tree-row">
+                <span class="tree-file-indent"></span>
+                <span>01-Introduction</span>
+              </div>
+              <div class="tree-row">
+                <span class="tree-file-indent"></span>
+                <span>02-Architecture</span>
+              </div>
+              <div class="tree-row active keyboard-focused">
+                <span class="tree-file-indent"></span>
+                <span>03-The-Beginning</span>
+              </div>
+              <div class="tree-row">
+                <span class="tree-file-indent"></span>
+                <span>04-Retrospective</span>
+              </div>
+              <!-- Folder 2: collapsed -->
+              <div class="tree-row" style="margin-top: 4px;">
+                <span class="tree-chevron"><span class="material-icons-outlined" style="font-size: 14px;">keyboard_arrow_right</span></span>
+                <span class="tree-folder-icon"><span class="material-icons-outlined" style="font-size: 13px;">folder</span></span>
+                <span style="font-weight: 500;">Drafts & Research</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor Canvas Area -->
+          <div class="app-editor-area">
+            <!-- TOC Hover Dashes -->
+            <div class="toc-dashes-anchor">
+              <div class="toc-dashes-preview" title="Hover for Table of Contents">
+                <div class="toc-dash h1"></div>
+                <div class="toc-dash h2"></div>
+                <div class="toc-dash h3"></div>
+                <div class="toc-dash h2"></div>
+              </div>
+              <div class="toc-popover">
+                <div class="toc-popover-item h1">1. The Architecture of Silence</div>
+                <div class="toc-popover-item h2">1.1 Core Principles</div>
+                <div class="toc-popover-item h3">Predictability Beats Magic</div>
+                <div class="toc-popover-item h2">1.2 Typography & Tone</div>
+              </div>
+            </div>
+
+            <!-- Floating Find & Replace Bar -->
+            <div class="floating-find-bar">
+              <input type="text" class="find-input" value="silence" placeholder="Find..." />
+              <span class="find-counter">1/4</span>
+              <button class="find-btn" title="Previous (Shift+Enter)">
+                <span class="material-icons-outlined" style="font-size: 16px;">keyboard_arrow_up</span>
+              </button>
+              <button class="find-btn" title="Next (Enter)">
+                <span class="material-icons-outlined" style="font-size: 16px;">keyboard_arrow_down</span>
+              </button>
+              <button class="find-btn" title="Toggle Replace">
+                <span class="material-icons-outlined" style="font-size: 16px;">find_replace</span>
+              </button>
+              <button class="find-btn" title="Close (Esc)">
+                <span class="material-icons-outlined" style="font-size: 15px;">close</span>
+              </button>
+            </div>
+
+            <!-- Markdown Document Content -->
+            <div class="editor-inner-content md-editor-view view-mode-concealed" id="interactive-editor">
+              <div class="md-h1 clickable-line" onclick="setActiveLine(this)">
+                <span class="syntax-mark"># </span>The Architecture of Silence
+              </div>
+
+              <div class="md-p clickable-line active-caret-line" onclick="setActiveLine(this)">
+                The words are the <span class="syntax-mark">**</span><strong>interface</strong><span class="syntax-mark">**</span>. In NotBad, markdown marks recede into the canvas so the piece looks finished while being written.<span class="simulated-caret"></span>
+              </div>
+
+              <div class="md-p clickable-line" onclick="setActiveLine(this)">
+                Markdown editors traditionally force a compromise: either stare at raw markup syntax or introduce split preview panes. Both add friction between the author and the prose.
+              </div>
+
+              <div class="md-h2 clickable-line" onclick="setActiveLine(this)">
+                <span class="syntax-mark">## </span>Conceal, Don't Remove
+              </div>
+
+              <div class="md-quote clickable-line" onclick="setActiveLine(this)">
+                <span class="syntax-mark">> </span>"The canvas should feel like Hara's white — receptive, not sterile."
+              </div>
+
+              <div class="md-task-item clickable-line" onclick="setActiveLine(this)">
+                <span class="custom-checkbox checked" onclick="this.classList.toggle('checked')">
+                  <span class="material-icons" style="font-size:12px;">check</span>
+                </span>
+                <span>Port Trace's core interaction model to pure Flutter</span>
+              </div>
+              <div class="md-task-item clickable-line" onclick="setActiveLine(this)">
+                <span class="custom-checkbox" onclick="this.classList.toggle('checked')">
+                  <span class="material-icons" style="font-size:12px;">check</span>
+                </span>
+                <span>Typewriter scrolling & focus mode</span>
+              </div>
+            </div>
+
+            <!-- Floating Toolbar Pill -->
+            <div class="floating-toolbar-pill">
+              <!-- Glyph Button: H -->
+              <button class="pill-btn" title="Heading">H</button>
+              <!-- Glyph Button: B -->
+              <button class="pill-btn active" title="Bold (Ctrl+B)">B</button>
+              <!-- Glyph Button: I -->
+              <button class="pill-btn" title="Italic (Ctrl+I)" style="font-style: italic;">I</button>
+              <!-- Icon Button: List (Icons.format_list_bulleted) -->
+              <button class="pill-btn" title="List">
+                <span class="material-icons-outlined" style="font-size: 18px;">format_list_bulleted</span>
+              </button>
+              <!-- Icon Button: Search (Icons.search) -->
+              <button class="pill-btn" title="Find (Ctrl+F)">
+                <span class="material-icons-outlined" style="font-size: 18px;">search</span>
+              </button>
+              <div class="pill-divider"></div>
+              <!-- Glyph Button: # (View mode) -->
+              <button class="pill-btn" title="View mode: cycle (Ctrl+Shift+H)">#</button>
+              <!-- Icon Button: Focus mode (Icons.filter_center_focus) -->
+              <button class="pill-btn" title="Focus mode (Ctrl+Shift+F)">
+                <span class="material-icons-outlined" style="font-size: 18px;">filter_center_focus</span>
+              </button>
+              <!-- Icon Button: Stats (Icons.info_outline) -->
+              <div class="stats-tooltip">
+                <button class="pill-btn" title="Statistics">
+                  <span class="material-icons-outlined" style="font-size: 18px;">info</span>
+                </button>
+                <div class="stats-card">
+                  <strong style="color:var(--fg); font-size:13px;">312 words</strong><br/>
+                  <span style="color:var(--muted); font-size:12px;">1,840 characters · 2 min read</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         SECTION: COMMAND PALETTE (CTRL+K)
+         ========================================================= -->
+    <section id="command-palette">
+      <div class="section-header">
+        <h2>3. Command Palette (Ctrl+K)</h2>
+        <p>Modal overlay showing exact Material checkmarks on active items and right-aligned keyboard shortcuts.</p>
+      </div>
+
+      <div class="command-palette-card">
+        <div class="palette-search-box">
+          <span class="material-icons-outlined" style="color: var(--muted); font-size: 19px;">search</span>
+          <input type="text" class="palette-search-input" placeholder="Type a command or file name..." value="View" />
+        </div>
+
+        <div class="palette-list">
+          <div class="palette-section-title">Commands</div>
+
+          <div class="palette-item selected">
+            <div class="palette-item-left">
+              <span class="material-icons-outlined" style="font-size: 16px; color: var(--accent);">check</span>
+              <span>View Mode: Concealed</span>
+              <span class="palette-item-subtitle">— Active</span>
+            </div>
+            <span class="palette-shortcut">Ctrl+Shift+H</span>
+          </div>
+
+          <div class="palette-item">
+            <div class="palette-item-left">
+              <span style="width: 16px; display: inline-block;"></span>
+              <span>View Mode: Styled with Marks</span>
+            </div>
+            <span class="palette-shortcut">Ctrl+Shift+H</span>
+          </div>
+
+          <div class="palette-item">
+            <div class="palette-item-left">
+              <span style="width: 16px; display: inline-block;"></span>
+              <span>View Mode: Plain Markdown</span>
+            </div>
+            <span class="palette-shortcut">Ctrl+Shift+H</span>
+          </div>
+
+          <div class="palette-section-title">Settings Navigation</div>
+
+          <div class="palette-item">
+            <div class="palette-item-left">
+              <span style="width: 16px; display: inline-block;"></span>
+              <span>Appearance…</span>
+              <span class="palette-item-subtitle">— System · Light · Dark</span>
+            </div>
+            <span class="material-icons-outlined" style="font-size: 16px; color: var(--muted);">keyboard_arrow_right</span>
+          </div>
+
+          <div class="palette-item">
+            <div class="palette-item-left">
+              <span style="width: 16px; display: inline-block;"></span>
+              <span>Accent Color…</span>
+              <span class="palette-item-subtitle">— Azure</span>
+            </div>
+            <span class="material-icons-outlined" style="font-size: 16px; color: var(--muted);">keyboard_arrow_right</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         SECTION: DESIGN TOKENS
+         ========================================================= -->
+    <section id="tokens">
+      <div class="section-header">
+        <h2>4. Design Tokens Reference</h2>
+        <p>Direct values from <code>notbad-flutter/lib/theme.dart</code></p>
+      </div>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-title">Surfaces & Grounds</div>
+          <div class="token-row"><span class="token-name">bg</span><span class="token-val" id="val-bg">#F7F6F3</span></div>
+          <div class="token-row"><span class="token-name">sidebarBg</span><span class="token-val" id="val-sidebarBg">#EFEDE9</span></div>
+          <div class="token-row"><span class="token-name">codeBg</span><span class="token-val" id="val-codeBg">#EBEAE6</span></div>
+          <div class="token-row"><span class="token-name">toolbarBg</span><span class="token-val" id="val-toolbarBg">#FFFFFF</span></div>
+          <div class="token-row"><span class="token-name">border</span><span class="token-val" id="val-border">#E2E1DD</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Text & Marks</div>
+          <div class="token-row"><span class="token-name">fg</span><span class="token-val" id="val-fg">#2C2C2B</span></div>
+          <div class="token-row"><span class="token-name">muted</span><span class="token-val" id="val-muted">#8F8E8A</span></div>
+          <div class="token-row"><span class="token-name">marks</span><span class="token-val">fg @ 25% / 28%</span></div>
+          <div class="token-row"><span class="token-name">selection</span><span class="token-val">accent @ 25%</span></div>
+          <div class="token-row"><span class="token-name">line-height</span><span class="token-val">Tight 1.6 · Normal 1.85 · Relaxed 2.1</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Accents</div>
+          <div class="token-row"><span class="token-name">Amber</span><span class="token-val">#9A6700 / #D4A72C</span></div>
+          <div class="token-row"><span class="token-name">Crimson</span><span class="token-val">#CF222E / #F47067</span></div>
+          <div class="token-row"><span class="token-name">Fern</span><span class="token-val">#1A7F37 / #57AB5A</span></div>
+          <div class="token-row"><span class="token-name">Teal</span><span class="token-val">#0F766E / #2DD4BF</span></div>
+          <div class="token-row"><span class="token-name">Azure</span><span class="token-val">#0969DA / #4493F8</span></div>
+          <div class="token-row"><span class="token-name">Graphite</span><span class="token-val">#57606A / #8B949E</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Theme Switcher Logic
+    const themeButtons = document.querySelectorAll('#theme-switch button');
+    const rootBody = document.body;
+
+    const tokenBg = document.getElementById('val-bg');
+    const tokenSidebarBg = document.getElementById('val-sidebarBg');
+    const tokenCodeBg = document.getElementById('val-codeBg');
+    const tokenToolbarBg = document.getElementById('val-toolbarBg');
+    const tokenBorder = document.getElementById('val-border');
+    const tokenFg = document.getElementById('val-fg');
+    const tokenMuted = document.getElementById('val-muted');
+
+    themeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        themeButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const theme = btn.getAttribute('data-val');
+        rootBody.setAttribute('data-theme', theme);
+
+        if (theme === 'dark') {
+          tokenBg.textContent = '#2D2D2D';
+          tokenSidebarBg.textContent = '#252525';
+          tokenCodeBg.textContent = '#383838';
+          tokenToolbarBg.textContent = '#3A3A3A';
+          tokenBorder.textContent = '#454545';
+          tokenFg.textContent = '#E6E5E2';
+          tokenMuted.textContent = '#98978F';
+        } else {
+          tokenBg.textContent = '#F7F6F3';
+          tokenSidebarBg.textContent = '#EFEDE9';
+          tokenCodeBg.textContent = '#EBEAE6';
+          tokenToolbarBg.textContent = '#FFFFFF';
+          tokenBorder.textContent = '#E2E1DD';
+          tokenFg.textContent = '#2C2C2B';
+          tokenMuted.textContent = '#8F8E8A';
+        }
+        updateAccentColor();
+      });
+    });
+
+    // Accent Switcher Logic
+    const accentSwatches = document.querySelectorAll('#accent-swatches .swatch-btn');
+    let currentAccent = 'azure';
+
+    const accentMap = {
+      amber: { light: '#9A6700', dark: '#D4A72C' },
+      crimson: { light: '#CF222E', dark: '#F47067' },
+      fern: { light: '#1A7F37', dark: '#57AB5A' },
+      teal: { light: '#0F766E', dark: '#2DD4BF' },
+      azure: { light: '#0969DA', dark: '#4493F8' },
+      graphite: { light: '#57606A', dark: '#8B949E' }
+    };
+
+    function updateAccentColor() {
+      const isDark = rootBody.getAttribute('data-theme') === 'dark';
+      const hex = isDark ? accentMap[currentAccent].dark : accentMap[currentAccent].light;
+      document.documentElement.style.setProperty('--accent', hex);
+
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      document.documentElement.style.setProperty('--accent-alpha-25', `rgba(${r}, ${g}, ${b}, 0.25)`);
+      document.documentElement.style.setProperty('--accent-alpha-15', `rgba(${r}, ${g}, ${b}, 0.15)`);
+      document.documentElement.style.setProperty('--accent-alpha-45', `rgba(${r}, ${g}, ${b}, 0.45)`);
+    }
+
+    accentSwatches.forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        accentSwatches.forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        currentAccent = swatch.getAttribute('data-accent');
+        updateAccentColor();
+      });
+    });
+
+    // View Mode Switcher
+    const viewButtons = document.querySelectorAll('#view-mode-switch button');
+    const editor = document.getElementById('interactive-editor');
+
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.getAttribute('data-mode');
+
+        editor.classList.remove('view-mode-concealed', 'view-mode-marks', 'view-mode-plain');
+        editor.classList.add(`view-mode-${mode}`);
+      });
+    });
+
+    // Sidebar Toggle
+    const toggleBtn = document.getElementById('toggle-sidebar-btn');
+    const sidebar = document.getElementById('spec-sidebar');
+
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+    });
+
+    // Active Caret Line in Interactive Editor
+    function setActiveLine(element) {
+      const lines = document.querySelectorAll('.clickable-line');
+      lines.forEach(l => {
+        l.classList.remove('active-caret-line');
+        const existingCaret = l.querySelector('.simulated-caret');
+        if (existingCaret) existingCaret.remove();
+      });
+
+      element.classList.add('active-caret-line');
+      const caret = document.createElement('span');
+      caret.className = 'simulated-caret';
+      element.appendChild(caret);
+    }
+  </script>
+</body>
+</html>
