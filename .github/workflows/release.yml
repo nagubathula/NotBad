@@ -91,6 +91,9 @@ jobs:
         run: |
           mkdir -p dist
           cd notbad-flutter/build/macos/Build/Products/Release
+          if [ -d "notbad_flutter.app" ]; then
+            cp -R notbad_flutter.app NotBad.app
+          fi
           zip -r -y ../../../../../dist/NotBad-macos.zip NotBad.app
       - uses: actions/upload-artifact@v4
         with:
@@ -107,10 +110,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          pattern: artifacts-*
           merge-multiple: true
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.1.0' }}
           files: release-assets/*
           generate_release_notes: true
           draft: false
