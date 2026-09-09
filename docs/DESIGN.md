@@ -10,18 +10,18 @@
 
 ### 1.1 The problem
 
-Markdown editors force a choice: stare at raw syntax while writing, or split the screen with a preview pane. Both put *plumbing* between the writer and the words. [Trace](https://github.com/john-mrty/Trace) (built on MarkEdit's CodeMirror engine) solved this beautifully — but only on macOS, and only by embedding a web engine.
+Markdown editors force a choice: stare at raw syntax while writing, or split the screen with a preview pane. Both put *plumbing* between the writer and the words. Concealing markdown syntax in place is the ideal interaction model, but traditional desktop implementations have historically required embedded web engines and heavy browser processes.
 
 ### 1.2 The bet
 
-**The words are the interface.** NotBad ports Trace's product idea to Windows, macOS, and Linux as a *pure-Flutter* app: the Markdown-aware editor is implemented natively in Dart. No web view, no CodeMirror, no per-platform behavior drift.
+**The words are the interface.** NotBad is designed from the ground up for Windows, macOS, and Linux as a *pure-Flutter* app: the Markdown-aware editor is implemented natively in Dart. No web view, no CodeMirror, no per-platform behavior drift.
 
-| | Trace (original) | NotBad |
+| | Traditional Desktop Editors | NotBad |
 |---|---|---|
-| Platform | macOS 15+ only | Windows / macOS / Linux |
-| Editor engine | CodeMirror 6 in WKWebView (~14.6k lines TS) | Custom `TextEditingController` (~700 lines Dart) |
-| Shell | AppKit (~28k lines Swift) | Flutter (~3.5k lines Dart) |
-| Install size | — | ~28 MB unpacked, 10.8 MB installer |
+| Platform | Heavy multi-process runtime | Windows / macOS / Linux (single binary) |
+| Editor engine | Chromium / WKWebView + 15k+ lines JS | Custom `TextEditingController` (~700 lines Dart) |
+| Shell | Node.js / Electron / WebView (~150MB overhead) | Flutter (~3.5k lines Dart) |
+| Install size | 100MB+ installer | ~28 MB unpacked, 10.8 MB installer |
 
 ### 1.3 Target user
 
@@ -33,7 +33,7 @@ A prose writer — notes, essays, documentation — who:
 
 ### 1.4 Non-goals
 
-Explicitly out of scope, inherited from Trace's philosophy of being "deliberately smaller": preview panes, split views, plugin managers, AI assistants, WYSIWYG toolbars with 40 buttons, and any feature that puts chrome between the writer and the text.
+Explicitly out of scope, adhering to our philosophy of being "deliberately smaller": preview panes, split views, plugin managers, AI assistants, WYSIWYG toolbars with 40 buttons, and any feature that puts chrome between the writer and the text.
 
 ---
 
@@ -79,7 +79,7 @@ flowchart TD
 
 ## 4. Design tokens
 
-All tokens live in [`lib/theme.dart`](../notbad-flutter/lib/theme.dart) as a `TracePalette` value object — one construction site for every color in the app.
+All tokens live in [`lib/theme.dart`](../notbad-flutter/lib/theme.dart) as a palette value object — one construction site for every color in the app.
 
 ### 4.1 Color — surfaces & text
 
@@ -94,7 +94,7 @@ All tokens live in [`lib/theme.dart`](../notbad-flutter/lib/theme.dart) as a `Tr
 | `border` | `#E2E1DD` | `#454545` | Hairlines, field outlines |
 | `toolbarBg` | `#FFFFFF` | `#3A3A3A` | Floating pill, popovers, TOC panel |
 
-Deliberately **not** pure white / pure black: the light theme is warm paper (`#F7F6F3`), matching Trace's "the canvas should feel like Hara's white — receptive, not sterile."
+Deliberately **not** pure white / pure black: the light theme is warm paper (`#F7F6F3`), inspired by Kenya Hara's design philosophy: "the canvas should feel like white — receptive, not sterile."
 
 ### 4.2 Color — accents
 
@@ -344,9 +344,9 @@ Each of these removes a micro-friction that, repeated hundreds of times per sess
 | Marks concealed via transparent spans | True text hiding (custom layout engine) | 1:1 caret↔source mapping for free; the custom engine remains future work for rendered code panels/images |
 | Caret-line mark reveal | Fully hidden always | Editing invisible characters is disorienting; predictability beats purity |
 | Two-level palette + search-through | One flat list · a settings window | Flat list didn't scale past ~20 items (real user feedback); a settings window contradicts "words are the interface" |
-| Word count behind ⓘ | Always-visible counter | A live counter is a nag; Trace hides it too |
+| Word count behind ⓘ | Always-visible counter | A live counter is a persistent nag; on-demand access preserves focus |
 | Receding toolbar | Static toolbar · no toolbar | Mouse affordances shouldn't cost keyboard users anything |
-| Warm paper `#F7F6F3` | Pure white / GitHub palette | First port draft used GitHub colors; side-by-side with Trace it read as "developer tool", not "writing paper" |
+| Warm paper `#F7F6F3` | Pure white / GitHub palette | Standard IDE colors read as a "developer tool", not a peaceful "writing paper" |
 | Sidebar files without icons/extensions | Standard file-tree look | Reads as a list of *writings*, not a file manager |
 | Native title bar hidden | Standard OS chrome | The one big band of non-content; its removal is most of the "seamless" feel |
 | Per-user installer (no admin) | MSI system-wide | Writers install their own tools; also enables clean MSIX path later |
@@ -367,7 +367,7 @@ Each of these removes a micro-friction that, repeated hundreds of times per sess
 |---|---|
 | Cold start → typing | ~1s |
 | Installed size | ~29 MB (10.8 MB installer) |
-| Lines of app code | ~3.5k Dart (vs ~28k Swift + 14.6k TS upstream) |
+| Lines of app code | ~3.5k Dart (vs typical 30k+ lines in legacy desktop editors) |
 | Test suite | 8 tests: view modes, CRLF, lists, search, welcome |
 | Platforms from one codebase | 3 (CI builds all) |
 
@@ -375,13 +375,30 @@ And one unmeasurable: the resting state of the app is a piece of paper with your
 
 ---
 
-## 10. Future design work
+## 10. Strategic Product & Technical Roadmap
 
-1. **Rendered elements** — the custom text-layout engine: code fences as rounded panels with copy buttons, real checkbox widgets, inline images, tables. The largest remaining gap to Trace.
-2. **Spellcheck** — wavy underlines via bundled hunspell dictionaries.
-3. **Overlay mode** — Trace's floating right-edge panel above other apps.
-4. **Copy as Rich Text on macOS/Linux** (currently Windows-clipboard only).
-5. **Accessibility pass** — the items in §8.
+### 10.1 Core Editor & Typography (Highest Impact)
+1. **Syntax Highlighting in Code Fences:** Integrate a palette-aware Dart syntax highlighter so code fences display subtle, legible tokens without webviews.
+2. **Inline Image Previews & Attachments:** Render local and relative image links (`![alt](path)`) seamlessly between paragraphs with gentle rounded styling.
+3. **Native Spellcheck & Suggestion Menus:** OS spellcheck integration rendering quiet red/amber wavy underlines with right-click replacements.
+4. **Markdown Table Grid Rendering:** Render pipe tables as clean, aligned hairline grids with keyboard cell navigation.
+5. **Math / LaTeX Expressions:** Native parsing and rendering for `$ ... $` and `$$ ... $$` equations.
+
+### 10.2 Writer Workflow Superpowers
+1. **Daily Word Goals & Progress Ring:** Non-nagging session targets in the Statistics popover (`ⓘ`).
+2. **Git Gutter Indicators in Sidebar:** Quiet status dots (`•` modified, `+` untracked) for version-controlled writing repositories.
+3. **Tactile Typewriter Audio (Opt-In):** Subtle mechanical key clicks and haptic drafting feedback.
+4. **Expanded Export Ecosystem:** Clean, publication-ready PDF export with custom typography presets alongside HTML export.
+
+### 10.3 Architecture & Engineering Refactoring
+1. **Modular Decomposition of `editor_screen.dart`:** Split into `FindReplaceOverlay`, `WindowHeaderBar`, `DocumentLifecycleManager`, and `EditorToolbarPill`.
+2. **Custom RenderObject Layout Engine:** Move toward hybrid text/widget layout for native inline interactive elements with 1:1 caret mapping.
+3. **Cross-Platform Golden UI Tests:** Automated pixel-comparison tests across Windows, macOS, and Linux runners.
+
+### 10.4 Accessibility & Platform Polish
+1. **Screen Reader Semantic Filter:** Clean prose filtering for NVDA/VoiceOver when marks are concealed.
+2. **High-Contrast & E-Ink Theme:** True monochrome preset (`#000000` / `#FFFFFF`) optimized for low-power E-Ink displays.
+3. **Community Linux Packaging:** Flathub Flatpak and Snapcraft distribution.
 
 ---
 

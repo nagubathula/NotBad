@@ -837,7 +837,7 @@
       <section id="tokens">
         <h2>4. Design Tokens & Color Harmony</h2>
         <p>
-          All tokens are instantiated in a single immutable <code>TracePalette</code> object in <code>lib/theme.dart</code>. We specifically avoided pure white (<code>#FFFFFF</code>) and developer-oriented bluish-dark (<code>#0D1117</code>).
+          All tokens are instantiated in a single immutable <code>AppPalette</code> object in <code>lib/theme.dart</code>. We specifically avoided pure white (<code>#FFFFFF</code>) and developer-oriented bluish-dark (<code>#0D1117</code>).
         </p>
         <p>
           The light theme uses <strong>Warm Paper (<code>#F7F6F3</code>)</strong>, providing an inviting tactile warmth that prevents eye strain during prolonged writing sessions. In dark mode, <strong>Neutral Warm (<code>#2D2D2D</code>)</strong> maintains contrast without harsh glare.
@@ -969,7 +969,7 @@
       <!-- Section 8 -->
       <section id="decisions">
         <h2>8. The Decision Log</h2>
-        <p>Summary of crucial architectural and UI decisions evaluated during the transition from Trace to NotBad:</p>
+        <p>Summary of crucial architectural and UI decisions evaluated during the architecture and UX design of NotBad:</p>
 
         <div class="decision-row">
           <div class="decision-header">
@@ -1006,11 +1006,11 @@
       <section id="outcomes">
         <h2>9. Outcomes & Results</h2>
         <p>
-          NotBad achieved full parity with Trace's aesthetic standards while succeeding where macOS-only apps could not:
+          NotBad proves that a focused, native architecture delivers an exceptional desktop writing experience:
         </p>
         <ul style="margin-left: 24px; margin-bottom: 24px;">
           <li>Delivered an identical experience across <strong>Windows 10/11, macOS, and Linux</strong> from a single codebase.</li>
-          <li>Reduced codebase complexity by over 80% (3.5k lines of Dart versus ~42k combined lines of Swift and TypeScript).</li>
+          <li>Reduced codebase complexity by over 80% (3.5k lines of Dart versus typical 30k+ line desktop writing suites).</li>
           <li>Created a zero-distraction writing environment that boots in ~1 second.</li>
         </ul>
 
@@ -1029,16 +1029,41 @@
 
       <!-- Section 10 -->
       <section id="future">
-        <h2>10. Future Design Work</h2>
+        <h2>10. Strategic Product & Technical Roadmap</h2>
         <p>
-          The design roadmap focuses on advancing the pure Dart custom text layout engine:
+          To evolve NotBad from a focused 1.0 release into a premier desktop writing suite, our roadmap prioritizes high-leverage enhancements organized across four core pillars:
         </p>
-        <ol style="margin-left: 24px; margin-bottom: 32px;">
-          <li><strong>Rendered Code Panels:</strong> Replacing text fences with rounded containers featuring language badges and copy actions.</li>
-          <li><strong>Interactive Inline Elements:</strong> Rendering real checkbox widgets and inline image attachments.</li>
-          <li><strong>Hunspell Spellcheck:</strong> Quiet squiggly error marks powered by local dictionaries.</li>
-          <li><strong>Accessibility & Localization Pass:</strong> Screen-reader validation for concealed spans and RTL support.</li>
-        </ol>
+
+        <h3>10.1 Core Editor & Typography (Highest Impact)</h3>
+        <ul style="margin-left: 24px; margin-bottom: 20px;">
+          <li><strong>Syntax Highlighting in Code Fences:</strong> Integrating a lightweight, palette-aware Dart syntax highlighter so code fences display subtle, legible language tokens without requiring a browser or webview.</li>
+          <li><strong>Inline Image Attachments:</strong> Rendering local and relative image links (<code>![alt](path)</code>) seamlessly inline between paragraphs with gentle rounded borders.</li>
+          <li><strong>Native Spellchecking:</strong> Leveraging OS spellcheck APIs to render tranquil wavy red/amber error underlines and right-click correction menus.</li>
+          <li><strong>Markdown Table Support:</strong> Formatting pipe tables into clean, aligned hairline grids with smooth keyboard navigation.</li>
+          <li><strong>Math / LaTeX Rendering:</strong> Seamless parsing and rendering of inline and block math formulas (<code>$ ... $</code> and <code>$$ ... $$</code>) for technical and academic writers.</li>
+        </ul>
+
+        <h3>10.2 Writer Workflow Superpowers</h3>
+        <ul style="margin-left: 24px; margin-bottom: 20px;">
+          <li><strong>Daily Word Goals & Progress Ring:</strong> An optional, non-nagging target counter inside the Statistics popover (<code>ⓘ</code>) that tracks session progress without cluttering the screen.</li>
+          <li><strong>Git Gutter Indicators in Sidebar:</strong> Quiet status dots (<code>•</code> modified, <code>+</code> untracked) on sidebar items to support version-controlled writing folders.</li>
+          <li><strong>Tactile Typewriter Audio (Opt-In):</strong> Optional mechanical key sounds and gentle haptic feedback to enhance drafting rhythm and sensory satisfaction.</li>
+          <li><strong>Clean PDF & Publication Export:</strong> Exporting formatted documents directly to publication-ready PDF with customizable typography presets.</li>
+        </ul>
+
+        <h3>10.3 Architecture & Engineering Refactoring</h3>
+        <ul style="margin-left: 24px; margin-bottom: 20px;">
+          <li><strong>Modular Decomposition of <code>editor_screen.dart</code>:</strong> Extracting discrete responsibilities into focused widgets (<code>FindReplaceOverlay</code>, <code>WindowHeaderBar</code>, <code>DocumentLifecycleManager</code>, and <code>EditorToolbarPill</code>) to enhance testability.</li>
+          <li><strong>Custom RenderObject Layout:</strong> Progressing from transparent text spans to a native hybrid layout engine capable of embedding interactive widgets directly into the text stream while guaranteeing exact 1:1 caret mapping.</li>
+          <li><strong>Cross-Platform Golden UI Tests:</strong> Automated pixel-comparison tests ensuring typographic and layout consistency across Windows, macOS, and Linux runners.</li>
+        </ul>
+
+        <h3>10.4 Accessibility & Platform Polish</h3>
+        <ul style="margin-left: 24px; margin-bottom: 32px;">
+          <li><strong>Screen Reader Semantic Filter:</strong> Ensuring screen readers (NVDA, VoiceOver) vocalize clean prose when marks are concealed, preventing stutter on hidden syntax spans.</li>
+          <li><strong>High-Contrast & E-Ink Theme:</strong> A true high-contrast monochrome appearance preset (<code>#000000</code> / <code>#FFFFFF</code>) optimized for low-power E-Ink monitors.</li>
+          <li><strong>Expanded Distribution:</strong> Publishing Linux packages on Flathub (Flatpak) and Snapcraft for seamless community installation.</li>
+        </ul>
 
         <p style="text-align: center; margin-top: 48px;">
           <a href="design.html" class="link-btn" style="padding: 10px 20px; font-size: 0.95rem;">
