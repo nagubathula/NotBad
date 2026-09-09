@@ -3,7 +3,7 @@
 ; CI builds this automatically for tagged releases (see release.yml).
 
 #define MyAppName "NotBad"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Nagubathula Satya Sai"
 #define MyAppURL "https://github.com/nagubathula/NotBad"
 #define MyAppExeName "notbad_flutter.exe"

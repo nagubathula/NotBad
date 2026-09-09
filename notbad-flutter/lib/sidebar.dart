@@ -43,6 +43,7 @@ class _FileSidebarState extends State<FileSidebar> {
   final _scroll = ScrollController();
   var _highlight = 0;
   List<(FileSystemEntity, int)> _rows = const [];
+  Map<String, String> _gitStatus = {};
   StreamSubscription<FileSystemEvent>? _watch;
   Timer? _watchDebounce;
 
@@ -51,6 +52,7 @@ class _FileSidebarState extends State<FileSidebar> {
     super.initState();
     _expanded.add(widget.rootPath);
     _startWatch();
+    _refreshGitStatus();
   }
 
   @override
@@ -62,6 +64,7 @@ class _FileSidebarState extends State<FileSidebar> {
         ..add(widget.rootPath);
       _highlight = 0;
       _startWatch();
+      _refreshGitStatus();
     }
   }
 
@@ -81,11 +84,56 @@ class _FileSidebarState extends State<FileSidebar> {
           .listen((_) {
         _watchDebounce?.cancel();
         _watchDebounce = Timer(const Duration(milliseconds: 300), () {
-          if (mounted) setState(() {});
+          if (mounted) {
+            setState(() {});
+            _refreshGitStatus();
+          }
         });
       });
     } catch (_) {
       // Watching unsupported here; the tree still refreshes on rebuild.
+    }
+  }
+
+  Future<void> _refreshGitStatus() async {
+    try {
+      var dir = Directory(widget.rootPath);
+      String? repoRoot;
+      while (true) {
+        if (Directory(p.join(dir.path, '.git')).existsSync()) {
+          repoRoot = dir.path;
+          break;
+        }
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
+      }
+      if (repoRoot == null) {
+        if (_gitStatus.isNotEmpty && mounted) {
+          setState(() => _gitStatus = {});
+        }
+        return;
+      }
+
+      final res = await Process.run('git', ['status', '--porcelain', '-uall'],
+          workingDirectory: repoRoot);
+      if (res.exitCode == 0 && mounted) {
+        final map = <String, String>{};
+        final lines = (res.stdout as String).split('\n');
+        for (final line in lines) {
+          if (line.length < 4) continue;
+          final status = line.substring(0, 2).trim();
+          var filePath = line.substring(3).trim();
+          if (filePath.startsWith('"') && filePath.endsWith('"')) {
+            filePath = filePath.substring(1, filePath.length - 1);
+          }
+          final absPath = p.normalize(p.join(repoRoot, filePath));
+          map[absPath] = status;
+        }
+        setState(() => _gitStatus = map);
+      }
+    } catch (_) {
+      // Git not available or not a git repository
     }
   }
 
@@ -303,7 +351,29 @@ class _FileSidebarState extends State<FileSidebar> {
                 ),
               ),
             ),
+            if (!isDir && _gitStatus.containsKey(p.normalize(entity.path))) ...[
+              const SizedBox(width: 4),
+              _buildGitBadge(_gitStatus[p.normalize(entity.path)]!, palette),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGitBadge(String status, TracePalette palette) {
+    final isUntracked = status.contains('?');
+    final color = isUntracked ? const Color(0xFF1A7F37) : const Color(0xFFD4A72C);
+    final label = isUntracked ? '+' : '•';
+    return Padding(
+      padding: const EdgeInsets.only(right: 4.0),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: isUntracked ? 13 : 16,
+          fontWeight: FontWeight.bold,
+          height: 1.0,
         ),
       ),
     );

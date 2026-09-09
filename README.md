@@ -1,8 +1,34 @@
-# NotBad
+<p align="center">
+  <img src=".github/assets/logo.png" alt="NotBad Logo" width="128" height="128">
+</p>
 
-*A quiet place to write — now on every desktop.*
+<h1 align="center">NotBad</h1>
 
-NotBad is a lightweight, cross-platform Markdown writer for **Windows, macOS, and Linux**, built with Flutter. It is a from-scratch port of [Trace](https://github.com/john-mrty/Trace) (itself built on the engine of [MarkEdit](https://github.com/MarkEdit-app/MarkEdit)), re-imagined as a **pure-Flutter app**: no embedded web view, no CodeMirror. The Markdown-aware editor is implemented natively in Dart, so the app starts fast, stays small (~28 MB), and behaves identically on every platform.
+<p align="center">
+  <em>A quiet place to write — now on every desktop.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/nagubathula/NotBad/releases"><img src="https://img.shields.io/github/v/release/nagubathula/NotBad?color=0969da&label=Release" alt="Latest Release"></a>
+  &nbsp;
+  <a href="https://github.com/nagubathula/NotBad/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+  &nbsp;
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/nagubathula/NotBad/releases/latest"><strong>Download Release »</strong></a>
+  &nbsp;•&nbsp;
+  <a href="docs/casestudy.html"><strong>UI/UX Case Study »</strong></a>
+  &nbsp;•&nbsp;
+  <a href="docs/design.html"><strong>Design System Visualizer »</strong></a>
+  &nbsp;•&nbsp;
+  <a href="CHANGELOG.md"><strong>Changelog »</strong></a>
+</p>
+
+---
+
+NotBad is a lightweight, cross-platform Markdown writer for **Windows, macOS, and Linux**, built with Flutter. Designed as a **pure-Flutter app**: no embedded web view, no heavy browser engines. The Markdown-aware editor is implemented natively in Dart, so the app starts fast, stays small (~28 MB), and behaves identically on every platform.
 
 ![NotBad demo — sidebar, command palette, view modes, live styling, focus mode, find, and accent colors](.github/assets/demo.gif)
 
@@ -110,8 +136,8 @@ On macOS, `Cmd` works in place of `Ctrl`.
 
 ## What's deliberately not here
 
-From Trace/MarkEdit, these are macOS-only and have no cross-platform equivalent: QuickLook previews, Time Machine file versions, Apple Writing Tools / Foundation Models / Translation, and the Tahoe glass chrome. Still open: spellcheck (needs bundled dictionaries), a fully custom editor surface (rounded code panels, inline images, real checkbox widgets), `.textbundle`, text encodings, and localization.
+Explicitly out of scope: preview panes, split views, AI assistant sidebars, and heavyweight webview bloat. NotBad remains focused on distraction-free writing. Future planned additions include native spellcheck, custom rendered code panels, inline images, and clean PDF export.
 
-## Credits
+## License
 
-Built on the ideas and design of [Trace](https://github.com/john-mrty/Trace) by John Moriarty and [MarkEdit](https://github.com/MarkEdit-app/MarkEdit) by cyanzhong and contributors. MIT licensed, with gratitude.
+MIT licensed, with gratitude to the open-source community.

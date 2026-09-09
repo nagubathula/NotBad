@@ -19,8 +19,12 @@ import 'quick_open.dart';
 import 'settings.dart';
 import 'sidebar.dart';
 import 'theme.dart';
+import 'widgets/find_replace_bar.dart';
+import 'widgets/floating_toolbar.dart';
+import 'widgets/hover_toc.dart';
+import 'widgets/window_title_bar.dart';
 
-const kAppVersion = '1.0.0';
+const kAppVersion = '1.1.0';
 const kUpdateRepo = 'nagubathula/NotBad';
 
 /// Hook the single-instance server uses to hand a file path (or an empty
@@ -926,6 +930,132 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     }
   }
 
+  Future<void> _exportPrintPdf() async {
+    final location = await getSaveLocation(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'HTML / Printable Document', extensions: ['html'])
+      ],
+      suggestedName:
+          '${_path == null ? 'Untitled' : p.basenameWithoutExtension(_path!)}-print.html',
+    );
+    if (location == null) return;
+    final body = md.markdownToHtml(_controller.text,
+        extensionSet: md.ExtensionSet.gitHubFlavored);
+    final title = const HtmlEscape().convert(_docName);
+    final html = '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>$title</title><style>'
+        '@page { size: A4; margin: 25mm 20mm; }'
+        'body{max-width:720px;margin:2.5rem auto;padding:0 1.5rem;'
+        'font:11pt/1.7 Charter,"Iowan Old Style","Georgia",Cambria,serif;color:#111;background:#fff}'
+        'h1,h2,h3,h4{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;font-weight:600;color:#000;line-height:1.25;margin-top:1.8em;margin-bottom:0.6em}'
+        'h1{font-size:24pt;border-bottom:1px solid #e5e5e5;padding-bottom:0.3em;margin-top:0}'
+        'h2{font-size:18pt;border-bottom:1px solid #f0f0f0;padding-bottom:0.2em}'
+        'h3{font-size:14pt}'
+        'p{margin:1em 0}'
+        'a{color:#0969da;text-decoration:none}'
+        'code{font-family:Consolas,Menlo,"DejaVu Sans Mono",monospace;font-size:9.5pt;background:#f5f5f4;padding:0.15em 0.3em;border-radius:3px}'
+        'pre{background:#f8f8f7;border:1px solid #e8e8e6;border-radius:6px;padding:1em;overflow-x:auto;font-family:Consolas,Menlo,monospace;font-size:9pt;line-height:1.5;page-break-inside:avoid}'
+        'pre code{background:none;padding:0}'
+        'blockquote{border-left:3px solid #ccc;margin:1.2em 0;padding-left:1em;color:#555;font-style:italic}'
+        'table{border-collapse:collapse;width:100%;margin:1.2em 0;page-break-inside:avoid}'
+        'th,td{border:1px solid #ddd;padding:0.4em 0.8em;text-align:left;font-size:10pt}'
+        'th{background:#f9f9f9;font-weight:600}'
+        'hr{border:none;border-top:1px solid #e0e0e0;margin:2em 0}'
+        'img{max-width:100%;height:auto;display:block;margin:1.5em auto}'
+        '@media print {'
+        '  body{max-width:100%;margin:0;padding:0}'
+        '  h1,h2,h3{page-break-after:avoid}'
+        '  pre,blockquote,table,img{page-break-inside:avoid}'
+        '}'
+        '</style></head><body>'
+        '$body'
+        '<script>window.addEventListener("DOMContentLoaded", function() { setTimeout(function() { window.print(); }, 400); });</script>'
+        '</body></html>';
+    await File(location.path).writeAsString(html);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => launchUrl(Uri.file(location.path)),
+          ),
+          content: Text('Saved printable document to ${p.basename(location.path)}')));
+    }
+    try {
+      await launchUrl(Uri.file(location.path));
+    } catch (_) {}
+  }
+
+  Future<void> _promptDailyWordGoal() async {
+    final controller = TextEditingController(
+        text: widget.settings.dailyWordGoal > 0
+            ? widget.settings.dailyWordGoal.toString()
+            : '750');
+    final goal = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Daily Writing Goal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Set a target word count for your drafting sessions. An ambient progress ring will reflect your completion in the statistics popover.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Word Goal (0 to disable)',
+                hintText: 'e.g. 500, 750, 1000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text.trim()) ?? 0;
+              Navigator.of(context).pop(val);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (goal != null) {
+      widget.settings.setDailyWordGoal(goal);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 2),
+          content: Text(goal > 0
+              ? 'Daily word goal set to $goal words.'
+              : 'Daily word goal disabled.'),
+        ));
+      }
+    }
+  }
+
+  void _toggleEInkMode() {
+    widget.settings.setEInkMode(!widget.settings.eInkMode);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 2),
+        content: Text(widget.settings.eInkMode
+            ? 'E-Ink high-contrast mode enabled.'
+            : 'E-Ink high-contrast mode disabled.'),
+      ));
+    }
+  }
+
   // ---- Click interactions ------------------------------------------------
 
   void _handleEditorTap() {
@@ -1365,6 +1495,25 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           searchOnly: true,
           run: _exportHtml),
       PaletteAction(
+          title: 'Export as Printable PDF / Document…',
+          category: 'File',
+          searchOnly: true,
+          run: _exportPrintPdf),
+      PaletteAction(
+          title: 'Set Daily Writing Goal…',
+          category: 'Writing',
+          subtitle: settings.dailyWordGoal > 0
+              ? '${settings.dailyWordGoal} words'
+              : 'Disabled',
+          searchOnly: true,
+          run: _promptDailyWordGoal),
+      PaletteAction(
+          title: 'Toggle E-Ink / High-Contrast Mode',
+          category: 'View',
+          checked: settings.eInkMode,
+          searchOnly: true,
+          run: _toggleEInkMode),
+      PaletteAction(
           title: 'Find…',
           category: 'Edit',
           shortcut: 'Ctrl+F',
@@ -1582,231 +1731,37 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   }
 
   Widget _buildFindBar(TracePalette palette) {
-    final matches = _controller.searchMatches;
-    final countLabel = matches.isEmpty
-        ? (_findController.text.isEmpty ? '' : '0/0')
-        : '${_matchIndex + 1}/${matches.length}';
-
-    Widget field(TextEditingController controller, String hint,
-        {FocusNode? focus, void Function(String)? onChanged}) {
-      return SizedBox(
-        width: 190,
-        height: 28,
-        child: TextField(
-          controller: controller,
-          focusNode: focus,
-          onChanged: onChanged,
-          style: TextStyle(color: palette.fg, fontSize: 13),
-          cursorColor: palette.accent,
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: hint,
-            hintStyle: TextStyle(color: palette.muted, fontSize: 13),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            filled: true,
-            fillColor: palette.bg.withValues(alpha: 0.6),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: palette.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: palette.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: palette.accent),
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget smallButton(IconData icon, String tooltip, VoidCallback onTap) {
-      return Tooltip(
-        message: tooltip,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(6),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(5),
-            child: Icon(icon, size: 15, color: palette.muted),
-          ),
-        ),
-      );
-    }
-
-    return Material(
-      color: palette.toolbarBg,
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Focus(
-                  onKeyEvent: _onFindKey,
-                  child: field(_findController, 'Find', focus: _findFocus,
-                      onChanged: (_) {
-                    _matchIndex = 0;
-                    _updateMatches();
-                  }),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 44,
-                  child: Text(countLabel,
-                      style: TextStyle(color: palette.muted, fontSize: 12)),
-                ),
-                smallButton(Icons.keyboard_arrow_up, 'Previous (Shift+Enter)',
-                    () => _findStep(-1)),
-                smallButton(Icons.keyboard_arrow_down, 'Next (Enter)',
-                    () => _findStep(1)),
-                smallButton(
-                    _replaceVisible
-                        ? Icons.expand_less
-                        : Icons.find_replace_outlined,
-                    'Replace',
-                    () => setState(() => _replaceVisible = !_replaceVisible)),
-                smallButton(Icons.close, 'Close (Esc)', _closeFind),
-              ],
-            ),
-            if (_replaceVisible) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  field(_replaceController, 'Replace with'),
-                  const SizedBox(width: 8),
-                  TextButton(
-                      onPressed: _replaceCurrent,
-                      child: Text('Replace',
-                          style: TextStyle(
-                              fontSize: 12, color: palette.accent))),
-                  TextButton(
-                      onPressed: _replaceAll,
-                      child: Text('All',
-                          style: TextStyle(
-                              fontSize: 12, color: palette.accent))),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+    return FindReplaceBar(
+      palette: palette,
+      findController: _findController,
+      replaceController: _replaceController,
+      findFocus: _findFocus,
+      replaceVisible: _replaceVisible,
+      matchIndex: _matchIndex,
+      matchCount: _controller.searchMatches.length,
+      onFindChanged: (_) {
+        _matchIndex = 0;
+        _updateMatches();
+      },
+      onFindStep: _findStep,
+      onToggleReplace: () => setState(() => _replaceVisible = !_replaceVisible),
+      onClose: _closeFind,
+      onReplaceCurrent: _replaceCurrent,
+      onReplaceAll: _replaceAll,
+      onFindKey: _onFindKey,
     );
   }
 
   Widget _buildTitleBar(TracePalette palette) {
-    final showWindowButtons = Platform.isWindows || Platform.isLinux;
-    return Container(
-      height: _kTitleBarHeight,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            palette.bg.withValues(alpha: 0.92),
-            palette.bg.withValues(alpha: 0.0),
-          ],
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 4),
-          Opacity(
-            opacity: 0.55,
-            child: IconButton(
-              tooltip: 'Sidebar (Ctrl+\\)',
-              onPressed:
-                  _sidebarRoot == null ? _pickSidebarRoot : _toggleSidebar,
-              iconSize: 15,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.vertical_split_outlined, color: palette.muted),
-            ),
-          ),
-          Expanded(
-            child: DragToMoveArea(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onDoubleTap: _toggleMaximize,
-                child: Center(
-                  child: Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                        text: _docName,
-                        style: TextStyle(
-                          color: palette.fg.withValues(alpha: 0.75),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (_dirty)
-                        TextSpan(
-                          text: ' — Edited',
-                          style: TextStyle(
-                            color: palette.muted,
-                            fontSize: 12.5,
-                          ),
-                        ),
-                    ]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Opacity(
-            opacity: 0.55,
-            child: IconButton(
-              tooltip: 'Commands (Ctrl+K)',
-              onPressed: _showPalette,
-              iconSize: 15,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.keyboard_command_key, color: palette.muted),
-            ),
-          ),
-          const SizedBox(width: 6),
-          if (showWindowButtons) ...[
-            _WindowButton(
-              icon: Icons.remove,
-              label: 'Minimize',
-              palette: palette,
-              onPressed: () async {
-                try {
-                  await windowManager.minimize();
-                } catch (_) {}
-              },
-            ),
-            _WindowButton(
-              icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
-              iconSize: _isMaximized ? 12 : 14,
-              label: _isMaximized ? 'Restore' : 'Maximize',
-              palette: palette,
-              onPressed: _toggleMaximize,
-            ),
-            _WindowButton(
-              icon: Icons.close,
-              label: 'Close',
-              palette: palette,
-              isClose: true,
-              onPressed: () async {
-                try {
-                  await windowManager.close();
-                } catch (_) {}
-              },
-            ),
-          ],
-        ],
-      ),
+    return WindowTitleBar(
+      palette: palette,
+      docName: _docName,
+      isDirty: _dirty,
+      isMaximized: _isMaximized,
+      onToggleSidebar:
+          _sidebarRoot == null ? _pickSidebarRoot : _toggleSidebar,
+      onShowPalette: _showPalette,
+      onToggleMaximize: _toggleMaximize,
     );
   }
 
@@ -1926,276 +1881,18 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   }
 
   Widget _buildToolbar(TracePalette palette) {
-    final glyphStyle = TextStyle(
-      color: palette.muted,
-      fontSize: 14.5,
-      fontWeight: FontWeight.w600,
-      height: 1,
-    );
-
-    Widget glyphButton(String glyph, String tooltip, VoidCallback onPressed,
-        {FontStyle? fontStyle, bool active = false}) {
-      return Tooltip(
-        message: tooltip,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
-            child: Text(
-              glyph,
-              style: glyphStyle.copyWith(
-                fontStyle: fontStyle,
-                color: active ? palette.accent : palette.muted,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget iconButton(IconData icon, String tooltip, VoidCallback onPressed,
-        {bool active = false}) {
-      return Tooltip(
-        message: tooltip,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Icon(icon,
-                size: 16, color: active ? palette.accent : palette.muted),
-          ),
-        ),
-      );
-    }
-
-    final chars = _controller.text.length;
-    final readMinutes = math.max(1, (_wordCount / 200).ceil());
-
-    return Material(
-      color: palette.toolbarBg,
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(22),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            glyphButton('H', 'Heading', _cycleHeading),
-            glyphButton('B', 'Bold (Ctrl+B)', () => _wrapSelection('**')),
-            glyphButton('I', 'Italic (Ctrl+I)', () => _wrapSelection('*'),
-                fontStyle: FontStyle.italic),
-            iconButton(Icons.format_list_bulleted, 'List', _toggleList),
-            iconButton(Icons.search, 'Find (Ctrl+F)',
-                () => _openFind(replace: false)),
-            glyphButton(
-                '#',
-                'View: ${_controller.viewMode.label} — click to cycle '
-                '(Ctrl+Shift+H)',
-                _cycleViewMode,
-                active: _controller.viewMode != MarkdownViewMode.concealed),
-            iconButton(Icons.filter_center_focus, 'Focus mode (Ctrl+Shift+F)',
-                _toggleFocusMode,
-                active: _controller.focusMode),
-            MenuAnchor(
-              menuChildren: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('$_wordCount words',
-                          style: TextStyle(fontSize: 13, color: palette.fg)),
-                      const SizedBox(height: 4),
-                      Text('$chars characters',
-                          style: TextStyle(fontSize: 12, color: palette.muted)),
-                      Text('$readMinutes min read',
-                          style: TextStyle(fontSize: 12, color: palette.muted)),
-                      if (_selWordCount > 0) ...[
-                        const SizedBox(height: 4),
-                        Text('$_selWordCount words selected',
-                            style: TextStyle(
-                                fontSize: 12, color: palette.accent)),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-              builder: (context, controller, child) => iconButton(
-                Icons.info_outline,
-                'Statistics',
-                () =>
-                    controller.isOpen ? controller.close() : controller.open(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Custom caption button for the hidden-title-bar window (Windows/Linux).
-class _WindowButton extends StatefulWidget {
-  final IconData icon;
-  final double iconSize;
-  final String label;
-  final TracePalette palette;
-  final bool isClose;
-  final VoidCallback onPressed;
-
-  const _WindowButton({
-    required this.icon,
-    required this.label,
-    required this.palette,
-    required this.onPressed,
-    this.iconSize = 15,
-    this.isClose = false,
-  });
-
-  @override
-  State<_WindowButton> createState() => _WindowButtonState();
-}
-
-class _WindowButtonState extends State<_WindowButton> {
-  var _hovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = widget.palette;
-    final hoverBg = widget.isClose
-        ? const Color(0xFFE81123)
-        : palette.fg.withValues(alpha: 0.08);
-    final iconColor = _hovering && widget.isClose
-        ? Colors.white
-        : palette.muted.withValues(alpha: _hovering ? 1 : 0.7);
-    return Tooltip(
-      message: widget.label,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovering = true),
-        onExit: (_) => setState(() => _hovering = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onPressed,
-          child: Container(
-            width: 44,
-            height: _kTitleBarHeight,
-            color: _hovering ? hoverBg : Colors.transparent,
-            child: Icon(widget.icon, size: widget.iconSize, color: iconColor),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Trace's hover table of contents: quiet dashes marking headings; hovering
-/// reveals the full outline, clicking jumps to a heading.
-class HoverToc extends StatefulWidget {
-  final TracePalette palette;
-  final List<(int level, String text, int offset)> headings;
-  final void Function(int offset) onJump;
-
-  const HoverToc({
-    super.key,
-    required this.palette,
-    required this.headings,
-    required this.onJump,
-  });
-
-  @override
-  State<HoverToc> createState() => _HoverTocState();
-}
-
-class _HoverTocState extends State<HoverToc> {
-  var _hovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.headings.isEmpty) return const SizedBox.shrink();
-    final palette = widget.palette;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 160),
-        switchInCurve: Curves.easeOutCubic,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: child,
-        ),
-        child: _hovering ? _panel(palette) : _dashes(palette),
-      ),
-    );
-  }
-
-  Widget _dashes(TracePalette palette) {
-    return Column(
-      key: const ValueKey('dashes'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final h in widget.headings.take(12))
-          Container(
-            width: (18.0 - (h.$1 - 1) * 4).clamp(6.0, 18.0),
-            height: 2,
-            margin: const EdgeInsets.symmetric(vertical: 3),
-            decoration: BoxDecoration(
-              color: palette.muted.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _panel(TracePalette palette) {
-    return Material(
-      key: const ValueKey('panel'),
-      color: palette.toolbarBg,
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 250,
-        constraints: const BoxConstraints(maxHeight: 380),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final h in widget.headings)
-                InkWell(
-                  onTap: () {
-                    setState(() => _hovering = false);
-                    widget.onJump(h.$3);
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                        left: 14.0 + (h.$1 - 1) * 12,
-                        right: 14,
-                        top: 5,
-                        bottom: 5),
-                    child: Text(
-                      h.$2,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: palette.fg,
-                        fontWeight:
-                            h.$1 == 1 ? FontWeight.w600 : FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    return FloatingToolbar(
+      palette: palette,
+      controller: _controller,
+      wordCount: _wordCount,
+      selWordCount: _selWordCount,
+      dailyWordGoal: widget.settings.dailyWordGoal,
+      onCycleHeading: _cycleHeading,
+      onWrapSelection: _wrapSelection,
+      onToggleList: _toggleList,
+      onOpenFind: () => _openFind(replace: false),
+      onCycleViewMode: _cycleViewMode,
+      onToggleFocusMode: _toggleFocusMode,
     );
   }
 }

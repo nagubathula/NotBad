@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'syntax_highlighter.dart';
 import 'theme.dart';
 
 const kMonoFallback = [
@@ -196,6 +197,7 @@ class MarkdownEditingController extends TextEditingController {
 
     final children = <InlineSpan>[];
     var inFence = false;
+    String? fenceLanguage;
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       var lineBase = base;
@@ -211,7 +213,7 @@ class MarkdownEditingController extends TextEditingController {
       final fenced = isFenceLine || inFence;
 
       final key = '${base.fontSize}|$dimmed|$onCaretLine|$fenced|'
-          '$isFenceLine|$inFrontmatter|$line';
+          '$isFenceLine|$inFrontmatter|$fenceLanguage|$line';
       var spans = _lineCache[key];
       if (spans == null) {
         if (inFrontmatter) {
@@ -227,25 +229,49 @@ class MarkdownEditingController extends TextEditingController {
             ),
           ];
         } else if (fenced) {
-          spans = [
-            TextSpan(
-              text: line,
-              style: lineBase.copyWith(
+          if (isFenceLine) {
+            spans = [
+              TextSpan(
+                text: line,
+                style: lineBase.copyWith(
+                  fontFamily: 'Consolas',
+                  fontFamilyFallback: kMonoFallback,
+                  fontSize: (lineBase.fontSize ?? 16) - 1.5,
+                  backgroundColor: _palette.codeBg,
+                  color: _palette.marks,
+                ),
+              ),
+            ];
+          } else {
+            spans = SyntaxHighlighter.highlightLine(
+              line: line,
+              language: fenceLanguage,
+              palette: _palette,
+              dimmed: dimmed,
+              baseStyle: lineBase.copyWith(
                 fontFamily: 'Consolas',
                 fontFamilyFallback: kMonoFallback,
                 fontSize: (lineBase.fontSize ?? 16) - 1.5,
                 backgroundColor: _palette.codeBg,
-                color: isFenceLine ? _palette.marks : lineBase.color,
               ),
-            ),
-          ];
+            );
+          }
         } else {
           spans = _styleLine(line, lineBase, dimmed, onCaretLine);
         }
         _lineCache[key] = spans;
       }
       children.addAll(spans);
-      if (isFenceLine) inFence = !inFence;
+      if (isFenceLine) {
+        if (!inFence) {
+          final lang = line.trim().replaceFirst(RegExp(r'^`{3,}'), '').trim();
+          fenceLanguage = lang.isEmpty ? null : lang;
+          inFence = true;
+        } else {
+          inFence = false;
+          fenceLanguage = null;
+        }
+      }
       if (i < lines.length - 1) {
         // Blank lines get a taller line box — paragraph breathing room.
         final tall = line.trim().isEmpty && !fenced;

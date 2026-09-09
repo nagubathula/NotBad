@@ -86,8 +86,8 @@ Future<void> main(List<String> args) async {
   runApp(NotBadApp(settings: settings, initialFile: initialFile));
 }
 
-/// NotBad — a Flutter port of Trace (a MarkEdit-based Markdown writer),
-/// re-implemented natively for Windows, macOS, and Linux.
+/// NotBad — a lightweight, distraction-free Markdown writer for
+/// Windows, macOS, and Linux, built with pure Flutter.
 class NotBadApp extends StatelessWidget {
   final AppSettings settings;
   final String? initialFile;
@@ -101,8 +101,10 @@ class NotBadApp extends StatelessWidget {
         title: 'NotBad',
         debugShowCheckedModeBanner: false,
         themeMode: settings.themeMode,
-        theme: buildTheme(Brightness.light, settings.accent),
-        darkTheme: buildTheme(Brightness.dark, settings.accent),
+        theme: buildTheme(Brightness.light, settings.accent,
+            eInk: settings.eInkMode),
+        darkTheme: buildTheme(Brightness.dark, settings.accent,
+            eInk: settings.eInkMode),
         home: EditorScreen(settings: settings, initialFile: initialFile),
       ),
     );

@@ -3,13 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release-windows:
-    name: Build & publish Windows release
+  build-windows:
+    name: Build Windows Release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,18 +24,94 @@ jobs:
         working-directory: notbad-flutter
       - run: flutter build windows --release
         working-directory: notbad-flutter
-      - name: Package
+      - name: Package Portable ZIP
         shell: pwsh
         run: |
           Compress-Archive -Path notbad-flutter/build/windows/x64/runner/Release/* `
             -DestinationPath NotBad-windows-x64.zip
-      - name: Build installer
+      - name: Build Installer (Inno Setup)
         shell: pwsh
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" notbad-flutter\installer\notbad.iss
-      - uses: softprops/action-gh-release@v2
+      - name: Stage Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item NotBad-windows-x64.zip dist/
+          Copy-Item notbad-flutter/installer/Output/NotBad-Setup-*.exe dist/
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            NotBad-windows-x64.zip
-            notbad-flutter/installer/Output/NotBad-Setup-*.exe
+          name: artifacts-windows
+          path: dist/*
+
+  build-linux:
+    name: Build Linux Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev
+      - run: flutter pub get
+        working-directory: notbad-flutter
+      - run: flutter test
+        working-directory: notbad-flutter
+      - run: flutter build linux --release
+        working-directory: notbad-flutter
+      - name: Package Tarball
+        run: |
+          mkdir -p dist
+          tar -czf dist/NotBad-linux-x64.tar.gz -C notbad-flutter/build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-linux
+          path: dist/*
+
+  build-macos:
+    name: Build macOS Release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: notbad-flutter
+      - run: flutter test
+        working-directory: notbad-flutter
+      - run: flutter build macos --release
+        working-directory: notbad-flutter
+      - name: Package App Bundle
+        run: |
+          mkdir -p dist
+          cd notbad-flutter/build/macos/Build/Products/Release
+          zip -r -y ../../../../../dist/NotBad-macos.zip NotBad.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-macos
+          path: dist/*
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
           generate_release_notes: true
+          draft: false
+          prerelease: false

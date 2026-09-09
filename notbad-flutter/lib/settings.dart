@@ -20,6 +20,9 @@ class AppSettings extends ChangeNotifier {
   double lineHeight = 1.85;
   bool smartTypography = false;
   int lastUpdateCheckDay = 0;
+  int dailyWordGoal = 0;
+  bool eInkMode = false;
+  bool showGitGutter = true;
 
   File? _file;
 
@@ -48,6 +51,9 @@ class AppSettings extends ChangeNotifier {
         settings.lineHeight = (data['lineHeight'] as num?)?.toDouble() ?? 1.85;
         settings.smartTypography = data['smartTypography'] as bool? ?? false;
         settings.lastUpdateCheckDay = data['lastUpdateCheckDay'] as int? ?? 0;
+        settings.dailyWordGoal = data['dailyWordGoal'] as int? ?? 0;
+        settings.eInkMode = data['eInkMode'] as bool? ?? false;
+        settings.showGitGutter = data['showGitGutter'] as bool? ?? true;
       }
     } catch (_) {
       // Missing/corrupt settings are non-fatal; start with defaults.
@@ -70,6 +76,9 @@ class AppSettings extends ChangeNotifier {
         'lineHeight': lineHeight,
         'smartTypography': smartTypography,
         'lastUpdateCheckDay': lastUpdateCheckDay,
+        'dailyWordGoal': dailyWordGoal,
+        'eInkMode': eInkMode,
+        'showGitGutter': showGitGutter,
       }));
     } catch (_) {}
   }
@@ -118,6 +127,24 @@ class AppSettings extends ChangeNotifier {
 
   void setSmartTypography(bool value) {
     smartTypography = value;
+    notifyListeners();
+    _save();
+  }
+
+  void setDailyWordGoal(int goal) {
+    dailyWordGoal = goal.clamp(0, 100000);
+    notifyListeners();
+    _save();
+  }
+
+  void setEInkMode(bool value) {
+    eInkMode = value;
+    notifyListeners();
+    _save();
+  }
+
+  void setShowGitGutter(bool value) {
+    showGitGutter = value;
     notifyListeners();
     _save();
   }

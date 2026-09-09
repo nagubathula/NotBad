@@ -47,7 +47,37 @@ class TracePalette {
     required this.accent,
   });
 
-  factory TracePalette.of(Brightness brightness, String accentKey) {
+  factory TracePalette.of(Brightness brightness, String accentKey,
+      {bool eInk = false}) {
+    if (eInk) {
+      if (brightness == Brightness.light) {
+        return const TracePalette(
+          brightness: Brightness.light,
+          bg: Color(0xFFFFFFFF),
+          sidebarBg: Color(0xFFF2F2F2),
+          fg: Color(0xFF000000),
+          muted: Color(0xFF555555),
+          marks: Color(0xFF777777),
+          codeBg: Color(0xFFEEEEEE),
+          border: Color(0xFF000000),
+          toolbarBg: Color(0xFFFFFFFF),
+          accent: Color(0xFF000000),
+        );
+      }
+      return const TracePalette(
+        brightness: Brightness.dark,
+        bg: Color(0xFF000000),
+        sidebarBg: Color(0xFF111111),
+        fg: Color(0xFFFFFFFF),
+        muted: Color(0xFFAAAAAA),
+        marks: Color(0xFF888888),
+        codeBg: Color(0xFF1C1C1C),
+        border: Color(0xFFFFFFFF),
+        toolbarBg: Color(0xFF000000),
+        accent: Color(0xFFFFFFFF),
+      );
+    }
+
     final accent =
         (kAccents[accentKey] ?? kAccents['azure']!).forBrightness(brightness);
     if (brightness == Brightness.light) {
@@ -79,8 +109,9 @@ class TracePalette {
   }
 }
 
-ThemeData buildTheme(Brightness brightness, String accentKey) {
-  final palette = TracePalette.of(brightness, accentKey);
+ThemeData buildTheme(Brightness brightness, String accentKey,
+    {bool eInk = false}) {
+  final palette = TracePalette.of(brightness, accentKey, eInk: eInk);
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
