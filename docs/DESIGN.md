@@ -6,11 +6,12 @@
 
 ---
 
-## 1. Product framing
+## 1. ****Product**** framing
 
 ### 1.1 The problem
 
 Markdown editors force a choice: stare at raw syntax while writing, or split the screen with a preview pane. Both put *plumbing* between the writer and the words. Concealing markdown syntax in place is the ideal interaction model, but traditional desktop implementations have historically required embedded web engines and heavy browser processes.
+
 
 ### 1.2 The bet
 
