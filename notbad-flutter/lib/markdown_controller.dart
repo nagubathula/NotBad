@@ -140,6 +140,9 @@ class MarkdownEditingController extends TextEditingController {
   static final _quoteRe = RegExp(r'^(\s*>+\s?)(.*)$');
   static final _taskRe = RegExp(r'^(\s*)([-*+])(\s+)\[([ xX])\](\s+)(.*)$');
   static final _listRe = RegExp(r'^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$');
+  static final _tableRowRe = RegExp(r'^\s*\|.*\|\s*$');
+  static final _tableDividerRe =
+      RegExp(r'^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$');
   static final _inlineRe = RegExp(
     r'(\*\*\*[^*\n]+\*\*\*)'
     r'|(\*\*[^*\n]+\*\*)'
@@ -212,8 +215,27 @@ class MarkdownEditingController extends TextEditingController {
       final isFenceLine = !inFrontmatter && _fenceRe.hasMatch(line);
       final fenced = isFenceLine || inFence;
 
+      final hasPipe = line.contains('|');
+      final isTableDivider =
+          !inFrontmatter && !fenced && hasPipe && _tableDividerRe.hasMatch(line);
+      final isTableHeader = !inFrontmatter &&
+          !fenced &&
+          hasPipe &&
+          !isTableDivider &&
+          i + 1 < lines.length &&
+          _tableDividerRe.hasMatch(lines[i + 1]);
+      final isTableRow = !inFrontmatter &&
+          !fenced &&
+          hasPipe &&
+          (_tableRowRe.hasMatch(line) ||
+              isTableDivider ||
+              isTableHeader ||
+              (i > 0 &&
+                  (_tableDividerRe.hasMatch(lines[i - 1]) ||
+                      _tableRowRe.hasMatch(lines[i - 1]))));
+
       final key = '${base.fontSize}|$dimmed|$onCaretLine|$fenced|'
-          '$isFenceLine|$inFrontmatter|$fenceLanguage|$line';
+          '$isFenceLine|$inFrontmatter|$fenceLanguage|$isTableRow|$isTableHeader|$isTableDivider|$line';
       var spans = _lineCache[key];
       if (spans == null) {
         if (inFrontmatter) {
@@ -256,6 +278,16 @@ class MarkdownEditingController extends TextEditingController {
               ),
             );
           }
+        } else if (isTableRow) {
+          spans = _styleTableRow(
+            line,
+            lineBase,
+            dimmed,
+            onCaretLine,
+            isTableHeader: isTableHeader,
+            isTableDivider: isTableDivider,
+            rowIndex: i,
+          );
         } else {
           spans = _styleLine(line, lineBase, dimmed, onCaretLine);
         }
@@ -577,5 +609,260 @@ class MarkdownEditingController extends TextEditingController {
       end++;
     }
     return {for (var i = start; i <= end; i++) i};
+  }
+
+  /// Renders a Markdown table row with monospace alignment, distinct pipes,
+  /// bold headers with background shading, and styled divider row.
+  List<InlineSpan> _styleTableRow(
+    String line,
+    TextStyle base,
+    bool dimmed,
+    bool onCaretLine, {
+    required bool isTableHeader,
+    required bool isTableDivider,
+    required int rowIndex,
+  }) {
+    final tableMono = base.copyWith(
+      fontFamily: 'Consolas',
+      fontFamilyFallback: kMonoFallback,
+      fontSize: (base.fontSize ?? 16) - 1.0,
+    );
+
+    final pipeIndices = <int>[];
+    for (var i = 0; i < line.length; i++) {
+      if (line[i] == '|') {
+        pipeIndices.add(i);
+      }
+    }
+
+    if (pipeIndices.isEmpty) {
+      return _styleLine(line, base, dimmed, onCaretLine);
+    }
+
+    final marks = _markStyle(tableMono, onCaretLine);
+
+    final Color? rowBg;
+    if (isTableHeader) {
+      rowBg = _palette.codeBg.withValues(alpha: 0.65);
+    } else if (isTableDivider) {
+      rowBg = _palette.codeBg.withValues(alpha: 0.35);
+    } else {
+      rowBg = (rowIndex % 2 == 1)
+          ? _palette.codeBg.withValues(alpha: 0.25)
+          : null;
+    }
+
+    final TextStyle pipeStyle;
+    if (dimmed) {
+      pipeStyle = tableMono.copyWith(
+        color: base.color,
+        backgroundColor: rowBg,
+      );
+    } else if (isTableHeader) {
+      pipeStyle = tableMono.copyWith(
+        color: _palette.accent.withValues(alpha: 0.85),
+        fontWeight: FontWeight.w600,
+        backgroundColor: rowBg,
+      );
+    } else {
+      pipeStyle = tableMono.copyWith(
+        color: _palette.border.withValues(alpha: 0.9),
+        backgroundColor: rowBg,
+      );
+    }
+
+    final cellBase = tableMono.copyWith(
+      backgroundColor: rowBg,
+      fontWeight: isTableHeader ? FontWeight.w700 : null,
+      color: isTableHeader && !dimmed ? _palette.fg : null,
+    );
+
+    final spans = <InlineSpan>[];
+
+    // 1. Text before the first pipe (e.g. leading indentation)
+    if (pipeIndices.first > 0) {
+      final leading = line.substring(0, pipeIndices.first);
+      spans.add(TextSpan(text: leading, style: tableMono));
+    }
+
+    // 2. Pipes and cells
+    for (var k = 0; k < pipeIndices.length; k++) {
+      spans.add(TextSpan(text: '|', style: pipeStyle));
+
+      if (k < pipeIndices.length - 1) {
+        final cellText =
+            line.substring(pipeIndices[k] + 1, pipeIndices[k + 1]);
+        if (isTableDivider) {
+          final dividerMarks = dimmed
+              ? base.color
+              : (onCaretLine || _viewMode == MarkdownViewMode.marks
+                  ? _palette.marks
+                  : _palette.border.withValues(alpha: 0.85));
+          spans.add(TextSpan(
+            text: cellText,
+            style: tableMono.copyWith(
+              color: dividerMarks,
+              backgroundColor: rowBg,
+            ),
+          ));
+        } else {
+          spans.addAll(_inlineSpans(cellText, cellBase, marks));
+        }
+      }
+    }
+
+    // 3. Text after the last pipe (e.g. trailing whitespace)
+    if (pipeIndices.last < line.length - 1) {
+      final trailing = line.substring(pipeIndices.last + 1);
+      spans.add(TextSpan(text: trailing, style: tableMono));
+    }
+
+    return spans;
+  }
+
+  /// Formats all markdown tables in the document by aligning columns.
+  static String formatTables(String text) {
+    final lines = text.split('\n');
+    final result = <String>[];
+    var i = 0;
+
+    while (i < lines.length) {
+      final line = lines[i];
+      final hasPipe = line.contains('|');
+      final isRow = hasPipe &&
+          (_tableRowRe.hasMatch(line) || _tableDividerRe.hasMatch(line));
+
+      if (!isRow) {
+        result.add(line);
+        i++;
+        continue;
+      }
+
+      // Gather consecutive lines containing pipes
+      final block = <String>[];
+      var j = i;
+      var hasDivider = false;
+      while (j < lines.length &&
+          lines[j].contains('|') &&
+          lines[j].trim().isNotEmpty) {
+        if (_tableDividerRe.hasMatch(lines[j])) {
+          hasDivider = true;
+        }
+        block.add(lines[j]);
+        j++;
+      }
+
+      // Only format if block has at least 2 rows and contains a valid divider
+      if (block.length >= 2 && hasDivider) {
+        result.addAll(_formatTableBlock(block));
+        i = j;
+      } else {
+        result.add(line);
+        i++;
+      }
+    }
+
+    return result.join('\n');
+  }
+
+  static List<String> _formatTableBlock(List<String> block) {
+    int dividerIdx = -1;
+    for (var k = 0; k < block.length; k++) {
+      if (_tableDividerRe.hasMatch(block[k])) {
+        dividerIdx = k;
+        break;
+      }
+    }
+    if (dividerIdx == -1) return block;
+
+    List<String> splitCells(String row) {
+      var trimmed = row.trim();
+      if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
+      if (trimmed.endsWith('|')) {
+        trimmed = trimmed.substring(0, trimmed.length - 1);
+      }
+      return trimmed.split('|').map((c) => c.trim()).toList();
+    }
+
+    final parsedRows = block.map(splitCells).toList();
+    var numCols = 0;
+    for (final row in parsedRows) {
+      if (row.length > numCols) numCols = row.length;
+    }
+    if (numCols == 0) return block;
+
+    // Parse column alignments from divider row
+    // 0: left (or none), 1: center, 2: right
+    final alignments = List<int>.filled(numCols, 0);
+    final dividerCells = parsedRows[dividerIdx];
+    for (var c = 0; c < numCols; c++) {
+      if (c < dividerCells.length) {
+        final d = dividerCells[c];
+        final startColon = d.startsWith(':');
+        final endColon = d.endsWith(':');
+        if (startColon && endColon) {
+          alignments[c] = 1; // center
+        } else if (endColon) {
+          alignments[c] = 2; // right
+        } else {
+          alignments[c] = 0; // left
+        }
+      }
+    }
+
+    // Determine max column width (minimum 3 for divider dashes)
+    final colWidths = List<int>.filled(numCols, 3);
+    for (var r = 0; r < parsedRows.length; r++) {
+      if (r == dividerIdx) continue;
+      final row = parsedRows[r];
+      for (var c = 0; c < row.length; c++) {
+        if (row[c].length > colWidths[c]) {
+          colWidths[c] = row[c].length;
+        }
+      }
+    }
+
+    final formatted = <String>[];
+    for (var r = 0; r < parsedRows.length; r++) {
+      final row = parsedRows[r];
+      if (r == dividerIdx) {
+        final cells = <String>[];
+        for (var c = 0; c < numCols; c++) {
+          final w = colWidths[c];
+          final align = alignments[c];
+          if (align == 1) {
+            final dashes = '-' * (w > 2 ? w - 2 : 1);
+            cells.add(':$dashes:');
+          } else if (align == 2) {
+            final dashes = '-' * (w > 1 ? w - 1 : 2);
+            cells.add('$dashes:');
+          } else {
+            final dashes = '-' * w;
+            cells.add(dashes);
+          }
+        }
+        formatted.add('| ${cells.join(' | ')} |');
+      } else {
+        final cells = <String>[];
+        for (var c = 0; c < numCols; c++) {
+          final text = c < row.length ? row[c] : '';
+          final w = colWidths[c];
+          final align = alignments[c];
+          if (align == 2) {
+            cells.add(text.padLeft(w));
+          } else if (align == 1) {
+            final pad = w - text.length;
+            final left = pad ~/ 2;
+            final right = pad - left;
+            cells.add('${" " * left}$text${" " * right}');
+          } else {
+            cells.add(text.padRight(w));
+          }
+        }
+        formatted.add('| ${cells.join(' | ')} |');
+      }
+    }
+
+    return formatted;
   }
 }

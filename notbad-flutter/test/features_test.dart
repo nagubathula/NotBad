@@ -228,4 +228,68 @@ void main() {
       }
     });
   });
+
+  group('Markdown Tables', () {
+    testWidgets('MarkdownEditingController styles tables with monospace, bold headers, and styled pipes',
+        (tester) async {
+      final palette = TracePalette.of(Brightness.light, 'azure');
+      final controller = MarkdownEditingController(palette: palette);
+      const tableText = '| Syntax | Description |\n'
+          '| --- | --- |\n'
+          '| Header | Title |\n'
+          '| Paragraph | Text |';
+      controller.text = tableText;
+
+      late TextSpan span;
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (context) {
+            span = controller.buildTextSpan(
+              context: context,
+              withComposing: false,
+            );
+            return Text.rich(span);
+          },
+        ),
+      ));
+
+      // 1:1 character preservation guarantee: exact plain text match
+      expect(span.toPlainText(), equals(tableText));
+
+      // Table spans should use Consolas monospace font
+      final hasConsolas = span.children?.any((child) {
+        if (child is TextSpan) {
+          return child.style?.fontFamily == 'Consolas';
+        }
+        return false;
+      }) ?? false;
+      expect(hasConsolas, isTrue);
+
+      // Header row text should have bold font weight
+      final hasBoldHeader = span.children?.any((child) {
+        if (child is TextSpan) {
+          return child.text?.contains('Syntax') == true &&
+              child.style?.fontWeight == FontWeight.w700;
+        }
+        return false;
+      }) ?? false;
+      expect(hasBoldHeader, isTrue);
+    });
+
+    test('MarkdownEditingController.formatTables aligns columns correctly', () {
+      const rawTable = '| Name | Age | City |\n'
+          '| --- | :---: | ---: |\n'
+          '| Alice | 24 | New York |\n'
+          '| Bob | 30 | San Francisco |';
+
+      final formatted = MarkdownEditingController.formatTables(rawTable);
+
+      const expected = '| Name  | Age |          City |\n'
+          '| ----- | :-: | ------------: |\n'
+          '| Alice | 24  |      New York |\n'
+          '| Bob   | 30  | San Francisco |';
+
+      expect(formatted, equals(expected));
+    });
+  });
 }

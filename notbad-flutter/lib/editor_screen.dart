@@ -1530,6 +1530,33 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     }
   }
 
+  void _formatTables() {
+    final text = _controller.text;
+    final formatted = MarkdownEditingController.formatTables(text);
+    if (formatted != text) {
+      final sel = _controller.selection;
+      _controller.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(
+          offset: sel.baseOffset.clamp(0, formatted.length),
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(seconds: 2),
+          content: Text('Tables formatted and aligned'),
+        ));
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(seconds: 2),
+          content: Text('Tables already aligned'),
+        ));
+      }
+    }
+  }
+
   // ---- Table of contents -------------------------------------------------
 
   List<(int level, String text, int offset)> _headings() {
@@ -1758,6 +1785,11 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           shortcut: 'Ctrl+Alt+C',
           run: _copyRichText),
       PaletteAction(
+          title: 'Format Tables (Align Columns)',
+          category: 'Edit',
+          shortcut: 'Shift+Alt+F',
+          run: _formatTables),
+      PaletteAction(
           title: 'Toggle Sidebar',
           category: 'View',
           shortcut: 'Ctrl+\\',
@@ -1827,6 +1859,8 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       const SingleActivator(LogicalKeyboardKey.f3, shift: true): () =>
           _findStep(-1),
       const SingleActivator(LogicalKeyboardKey.f12): _toggleInputLanguage,
+      const SingleActivator(LogicalKeyboardKey.keyF, alt: true, shift: true):
+          _formatTables,
       for (final meta in [false, true]) ...{
         SingleActivator(LogicalKeyboardKey.keyM, control: !meta, meta: meta):
             _toggleInputLanguage,
