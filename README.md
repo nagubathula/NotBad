@@ -1,10 +1,6 @@
 <p align="center">
   <img src=".github/assets/logo.png" alt="NotBad Logo" width="128" height="128">
 </p>
-sadhsjd
-
-
-sdjsdhjd
 
 <h1 align="center">NotBad</h1>
 
@@ -119,6 +115,23 @@ powershell -ExecutionPolicy Bypass -File installer\install.ps1
 To remove everything: `powershell -ExecutionPolicy Bypass -File installer\uninstall.ps1`
 
 **MSIX package** (for distribution / the Microsoft Store): after `flutter build windows`, run `dart run msix:create` — configuration lives in `pubspec.yaml` under `msix_config`.
+
+## Installing on Linux (Snap)
+
+NotBad is packaged as a standard Snap package for Ubuntu and all Linux distributions supporting `snapd`:
+
+```bash
+sudo snap install notbad
+```
+
+Or install the standalone tarball / `.snap` package directly from [GitHub Releases](https://github.com/nagubathula/NotBad/releases).
+
+To build the snap locally:
+```bash
+sudo snap install snapcraft --classic
+snapcraft --use-lxd
+sudo snap install notbad_*.snap --dangerous
+```
 
 ## Keyboard shortcuts
 

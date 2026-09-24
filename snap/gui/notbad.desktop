@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=NotBad
+Comment=Distraction-free Markdown Writer
+Exec=notbad %U
+Icon=${SNAP}/meta/gui/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;TextEditor;Office;
+MimeType=text/markdown;text/plain;
+StartupWMClass=notbad_flutter
+Keywords=markdown;editor;writer;notes;text;
