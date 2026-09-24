@@ -90,14 +90,14 @@ jobs:
       - name: Package App Bundle
         run: |
           mkdir -p dist
-          cd notbad-flutter/build/macos/Build/Products/Release
-          if [ -d "notbad_flutter.app" ]; then
-            cp -R notbad_flutter.app NotBad.app
+          APP_PATH=$(find notbad-flutter/build/macos/Build/Products/Release -name "*.app" -maxdepth 1 | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" dist/NotBad-macos.zip
           fi
-          zip -r -y ../../../../../dist/NotBad-macos.zip NotBad.app
       - uses: actions/upload-artifact@v4
         with:
           name: artifacts-macos
+          path: dist/*
   build-snap:
     name: Build & Publish Snap
     runs-on: ubuntu-latest
@@ -125,6 +125,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
+    if: always() && !cancelled() && (needs.build-windows.result == 'success' || needs.build-linux.result == 'success' || needs.build-macos.result == 'success' || needs.build-snap.result == 'success')
     needs: [build-windows, build-linux, build-macos, build-snap]
     runs-on: ubuntu-latest
     steps:
