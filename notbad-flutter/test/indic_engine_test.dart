@@ -46,13 +46,36 @@ void main() {
       expect(IndicEngine.mapTeluguAnu('a'), equals('ల'));
       expect(IndicEngine.mapTeluguAnu('b'), equals('మ'));
       expect(IndicEngine.mapTeluguAnu('h'), equals('్'));
+      expect(IndicEngine.mapTeluguAnu('H'), equals('్'));
       expect(IndicEngine.mapTeluguAnu('g'), equals('ం'));
-      expect(IndicEngine.mapTeluguAnu('q'), equals('అ'));
+      expect(IndicEngine.mapTeluguAnu('G'), equals('ః'));
+      expect(IndicEngine.mapTeluguAnu('f'), equals('వ'));
+      expect(IndicEngine.mapTeluguAnu('F'), equals('శ'));
+      expect(IndicEngine.mapTeluguAnu(';'), equals('ప'));
+      expect(IndicEngine.mapTeluguAnu(':'), equals('ఫ'));
+      expect(IndicEngine.mapTeluguAnu('l'), equals('న'));
+      expect(IndicEngine.mapTeluguAnu('L'), equals('ణ'));
+      expect(IndicEngine.mapTeluguAnu("'"), equals('స'));
+      expect(IndicEngine.mapTeluguAnu('"'), equals('ష'));
+      expect(IndicEngine.mapTeluguAnu('k'), equals('ర'));
+      expect(IndicEngine.mapTeluguAnu('K'), equals('ఱ'));
+      expect(IndicEngine.mapTeluguAnu('n'), equals('య'));
+      expect(IndicEngine.mapTeluguAnu('N'), equals('క్ష్య'));
+      expect(IndicEngine.mapTeluguAnu('O'), equals('ష్ట'));
+      expect(IndicEngine.mapTeluguAnu('P'), equals('ష్ట్ర'));
+      expect(IndicEngine.mapTeluguAnu('Y'), equals('క్ష'));
+      expect(IndicEngine.mapTeluguAnu('U'), equals('శ్రీ'));
+      expect(IndicEngine.mapTeluguAnu('Q'), equals('క్ష్మి'));
+      expect(IndicEngine.mapTeluguAnu('['), equals('ఐ'));
+      expect(IndicEngine.mapTeluguAnu('{'), equals('క్ష్మ'));
+      expect(IndicEngine.mapTeluguAnu(']'), equals('ఔ'));
     });
 
     test('maps Anu Script vowels vs contextual matras', () {
-      // Independent vowel
+      // Independent vowels
       expect(IndicEngine.mapTeluguAnu('e'), equals('ఆ'));
+      expect(IndicEngine.mapTeluguAnu('W'), equals('ఋ'));
+      expect(IndicEngine.mapTeluguAnu('E'), equals('ౠ'));
 
       // Contextual matras when preceded by a consonant
       expect(
@@ -69,6 +92,38 @@ void main() {
           IndicEngine.mapTeluguAnu('u', hasPrecedingConsonant: true), equals('ె'));
       expect(
           IndicEngine.mapTeluguAnu('o', hasPrecedingConsonant: true), equals('ే'));
+      expect(
+          IndicEngine.mapTeluguAnu('W', hasPrecedingConsonant: true), equals('ృ'));
+      expect(
+          IndicEngine.mapTeluguAnu('E', hasPrecedingConsonant: true), equals('ౄ'));
+      expect(
+          IndicEngine.mapTeluguAnu('[', hasPrecedingConsonant: true), equals('ై'));
+      expect(
+          IndicEngine.mapTeluguAnu(']', hasPrecedingConsonant: true), equals('ౌ'));
+    });
+
+    test('maps Anu Script number row symbols and math operators', () {
+      expect(IndicEngine.mapTeluguAnu('-'), equals('×'));
+      expect(IndicEngine.mapTeluguAnu('_'), equals('÷'));
+      expect(IndicEngine.mapTeluguAnu(r'$'), equals('ౖ'));
+      expect(IndicEngine.mapTeluguAnu('@'), equals("'"));
+      expect(IndicEngine.mapTeluguAnu('#'), equals('%'));
+      expect(IndicEngine.mapTeluguAnu('^'), equals('-'));
+      expect(IndicEngine.mapTeluguAnu('&'), equals('|'));
+      expect(IndicEngine.mapTeluguAnu('*'), equals("'"));
+      expect(IndicEngine.mapTeluguAnu('}'), equals('!'));
+    });
+
+    test('validates matra detection and zero-width characters', () {
+      expect(IndicEngine.isTeluguAnuMatraKey('e'), isTrue);
+      expect(IndicEngine.isTeluguAnuMatraKey('r'), isTrue);
+      expect(IndicEngine.isTeluguAnuMatraKey('['), isTrue);
+      expect(IndicEngine.isTeluguAnuMatraKey(']'), isTrue);
+      expect(IndicEngine.isTeluguAnuMatraKey('j'), isFalse);
+      expect(IndicEngine.isTeluguAnuMatraKey('a'), isFalse);
+
+      expect(IndicEngine.zwnj, equals('\u200C'));
+      expect(IndicEngine.zwj, equals('\u200D'));
     });
   });
 }

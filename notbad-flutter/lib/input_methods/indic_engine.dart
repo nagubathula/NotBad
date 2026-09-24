@@ -156,13 +156,34 @@ class IndicEngine {
         codeUnit == 0x0C4D;
   }
 
+  /// Zero-Width Non-Joiner (ZWNJ) to prevent unwanted conjunct formation.
+  static const String zwnj = '\u200C';
+
+  /// Zero-Width Joiner (ZWJ) to control conjunct ligature presentation.
+  static const String zwj = '\u200D';
+
+  /// Checks if a character key corresponds to a Telugu Anu vowel matra (gunintham).
+  static bool isTeluguAnuMatraKey(String char) {
+    return _teluguAnuMatras.containsKey(char);
+  }
+
+  /// Returns the vowel matra for a given Anu Script key.
+  static String? getTeluguAnuMatra(String char) {
+    return _teluguAnuMatras[char];
+  }
+
   /// Maps a key in the widely used Anu Script / Apple Telugu keyboard layout.
   /// [hasPrecedingConsonant] attaches vowel matras (guninthalu) to consonants.
   static String? mapTeluguAnu(String char,
       {bool hasPrecedingConsonant = false}) {
-    if (char == 'h') return '\u0C4D'; // Virama/pollu '్'
+    if (char == 'h' || char == 'H') return '\u0C4D'; // Virama/pollu '్'
     if (char == 'g') return '\u0C02'; // Anusvara 'ం'
     if (char == 'G') return '\u0C03'; // Visarga 'ః'
+
+    // Number row and layout-specific mathematical symbols
+    if (_teluguAnuSymbols.containsKey(char)) {
+      return _teluguAnuSymbols[char];
+    }
 
     // If preceded by a consonant, attach vowel matra (gunintham)
     if (hasPrecedingConsonant && _teluguAnuMatras.containsKey(char)) {
@@ -537,17 +558,18 @@ class IndicEngine {
     'S': '\u0C25', // థ
     'd': '\u0C26', // ద
     'D': '\u0C27', // ధ
-    'f': '\u0C2A', // ప
-    'F': '\u0C2B', // ఫ
+    'f': '\u0C35', // వ (Key F)
+    'F': '\u0C36', // శ (Shift+F)
     'j': '\u0C15', // క
     'J': '\u0C16', // ఖ
     'k': '\u0C30', // ర
-    'l': '\u0C38', // స
-    'L': '\u0C23', // ణ
-    ';': '\u0C35', // వ
-    ':': '\u0C36', // శ
-    "'": '\u0C28', // న
-    '"': '\u0C37', // ష
+    'K': '\u0C31', // ఱ (Shift+K)
+    'l': '\u0C28', // న (Key L)
+    'L': '\u0C23', // ణ (Shift+L)
+    ';': '\u0C2A', // ప (Key ;)
+    ':': '\u0C2B', // ఫ (Shift+;)
+    "'": '\u0C38', // స (Key ')
+    '"': '\u0C37', // ష (Shift+')
 
     // Row 4 (Z-row)
     'z': '\u0C1F', // ట
@@ -561,6 +583,7 @@ class IndicEngine {
     'b': '\u0C2E', // మ
     'B': '\u0C39', // హ
     'n': '\u0C2F', // య
+    'N': '\u0C15\u0C4D\u0C37\u0C4D\u0C2F', // క్ష్య (Shift+N)
     'm': '\u0C1A', // చ
     'M': '\u0C1B', // ఛ
     '/': '\u0C1C', // జ
@@ -571,11 +594,11 @@ class IndicEngine {
     'T': '\u0C1E', // ఞ
     'Y': '\u0C15\u0C4D\u0C37', // క్ష (క+్+ష)
     'U': '\u0C36\u0C4D\u0C30\u0C40', // శ్రీ (శ+్+ర+ీ)
-    'O': '\u0C30\u0C4D', // ర్
-    'P': '\u0C15\u0C43', // కృ
-    '[': '\u0C31', // ఱ
-    '{': '\u0C15\u0C4D\u0C37\u0C4D\u0C2E', // క్ష serial
-    'Q': '\u0C15\u0C4D\u0C37\u0C4D\u0C2E\u0C3F', // క్ష serial
+    'O': '\u0C37\u0C4D\u0C1F', // ష్ట (ష+్+ట)
+    'P': '\u0C37\u0C4D\u0C1F\u0C4D\u0C30', // ష్ట్ర (ష+్+ట+్+ర)
+    '{': '\u0C15\u0C4D\u0C37\u0C4D\u0C2E', // క్ష్మ (Shift+[)
+    'Q': '\u0C15\u0C4D\u0C37\u0C4D\u0C2E\u0C3F', // క్ష్మి (క+్+ష+్+మ+ి)
+    '\\': ':', // Colon on backslash
   };
 
   static const Map<String, String> _teluguAnuIndependentVowels = {
@@ -585,13 +608,14 @@ class IndicEngine {
     'w': '\u0C08', // ఈ
     'i': '\u0C09', // ఉ
     'p': '\u0C0A', // ఊ
-    'E': '\u0C0B', // ఋ
-    'W': '\u0C60', // ౠ
+    'W': '\u0C0B', // ఋ (Shift+W)
+    'E': '\u0C60', // ౠ (Shift+E)
+    '[': '\u0C10', // ఐ (Key [)
     'u': '\u0C0E', // ఎ
     'o': '\u0C0F', // ఏ
     't': '\u0C12', // ఒ
     'y': '\u0C13', // ఓ
-    ']': '\u0C14', // ఔ
+    ']': '\u0C14', // ఔ (Key ])
   };
 
   static const Map<String, String> _teluguAnuMatras = {
@@ -600,13 +624,28 @@ class IndicEngine {
     'w': '\u0C40', // ీ (ఈ matra)
     'i': '\u0C41', // ు (ఉ matra)
     'p': '\u0C42', // ూ (ఊ matra)
-    'E': '\u0C43', // ృ (ఋ matra)
-    'W': '\u0C44', // ౄ (ౠ matra)
+    'W': '\u0C43', // ృ (ఋ matra, Shift+W)
+    'E': '\u0C44', // ౄ (ౠ matra, Shift+E)
+    '[': '\u0C48', // ై (ఐ matra, Key [)
     'u': '\u0C46', // ె (ఎ matra)
     'o': '\u0C47', // ే (ఏ matra)
     't': '\u0C4A', // ొ (ఒ matra)
     'y': '\u0C4B', // ో (ఓ matra)
-    ']': '\u0C4C', // ౌ (ఔ matra)
+    ']': '\u0C4C', // ౌ (ఔ matra, Key ])
+  };
+
+  static const Map<String, String> _teluguAnuSymbols = {
+    '-': '\u00D7', // × (multiplication sign)
+    '_': '\u00F7', // ÷ (division sign)
+    '@': "'",
+    '#': '%',
+    r'$': '\u0C56', // ౖ (Telugu ai length mark)
+    '%': '(',
+    '^': '-',
+    '&': '|',
+    '*': "'",
+    '}': '!',
+    '|': ':',
   };
 }
 

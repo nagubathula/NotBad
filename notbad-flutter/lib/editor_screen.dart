@@ -710,7 +710,21 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   }
 
   void _showKeyboardReference() {
-    KeyboardLayoutDialog.show(context, _palette);
+    KeyboardLayoutDialog.show(
+      context,
+      _palette,
+      onKeyTap: (textToInsert) {
+        final sel = _controller.selection;
+        final text = _controller.text;
+        final start = sel.start >= 0 ? sel.start : text.length;
+        final end = sel.end >= 0 ? sel.end : text.length;
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(start, end, textToInsert),
+          selection:
+              TextSelection.collapsed(offset: start + textToInsert.length),
+        );
+      },
+    );
   }
 
   void _setInputLanguage(InputLanguage lang) {
@@ -928,15 +942,30 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
 
     if (_inputLanguage == InputLanguage.teluguAnu) {
       final prevChar = sel.start > 0 ? text[sel.start - 1] : '';
+      final isVirama = prevChar == '\u0C4D';
+
+      // Double virama (h/H after virama) inserts ZWNJ to preserve standalone pollu
+      if (isVirama && (ch == 'h' || ch == 'H')) {
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(sel.start, sel.end, IndicEngine.zwnj),
+          selection: TextSelection.collapsed(
+              offset: sel.start + IndicEngine.zwnj.length),
+        );
+        return KeyEventResult.handled;
+      }
+
       final hasPrecedingConsonant = prevChar.isNotEmpty &&
           IndicEngine.isTeluguConsonant(prevChar.codeUnitAt(0));
       final mapped = IndicEngine.mapTeluguAnu(ch,
           hasPrecedingConsonant: hasPrecedingConsonant);
       if (mapped != null) {
+        // If preceding char was virama and key is a vowel matra, replace the virama
+        final replaceStart =
+            (isVirama && IndicEngine.isTeluguAnuMatraKey(ch)) ? sel.start - 1 : sel.start;
         _controller.value = TextEditingValue(
-          text: text.replaceRange(sel.start, sel.end, mapped),
+          text: text.replaceRange(replaceStart, sel.end, mapped),
           selection:
-              TextSelection.collapsed(offset: sel.start + mapped.length),
+              TextSelection.collapsed(offset: replaceStart + mapped.length),
         );
         return KeyEventResult.handled;
       }
@@ -1077,10 +1106,11 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     final html = '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<title>$title</title><style>'
-        'body{max-width:720px;margin:3rem auto;padding:0 1.5rem;'
-        'font:16px/1.7 -apple-system,"Segoe UI",Roboto,sans-serif;'
+        '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;600;700&display=swap");'
+        'body{max-width:760px;margin:3rem auto;padding:0 1.5rem;'
+        'font:16px/1.85 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Telugu",Gautami,"Nirmala UI",Roboto,sans-serif;'
         'color:#2c2c2b;background:#fdfdfc}'
-        'h1,h2,h3{line-height:1.3}a{color:#0969da}'
+        'h1,h2,h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Telugu",Gautami,sans-serif;line-height:1.35}a{color:#0969da}'
         'code{background:#f0efec;padding:.15em .35em;border-radius:4px;'
         'font-size:.9em}pre{background:#f0efec;padding:1em;border-radius:8px;'
         'overflow-x:auto}pre code{background:none;padding:0}'
@@ -1112,10 +1142,11 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
     final html = '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<title>$title</title><style>'
+        '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;600;700&display=swap");'
         '@page { size: A4; margin: 25mm 20mm; }'
-        'body{max-width:720px;margin:2.5rem auto;padding:0 1.5rem;'
-        'font:11pt/1.7 Charter,"Iowan Old Style","Georgia",Cambria,serif;color:#111;background:#fff}'
-        'h1,h2,h3,h4{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;font-weight:600;color:#000;line-height:1.25;margin-top:1.8em;margin-bottom:0.6em}'
+        'body{max-width:760px;margin:2.5rem auto;padding:0 1.5rem;'
+        'font:11pt/1.85 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Telugu",Gautami,Charter,"Georgia",serif;color:#111;background:#fff}'
+        'h1,h2,h3,h4{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Telugu",Gautami,"Nirmala UI",Helvetica,Arial,sans-serif;font-weight:600;color:#000;line-height:1.3;margin-top:1.8em;margin-bottom:0.6em}'
         'h1{font-size:24pt;border-bottom:1px solid #e5e5e5;padding-bottom:0.3em;margin-top:0}'
         'h2{font-size:18pt;border-bottom:1px solid #f0f0f0;padding-bottom:0.2em}'
         'h3{font-size:14pt}'

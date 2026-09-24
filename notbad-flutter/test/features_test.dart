@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notbad_flutter/input_methods/indic_engine.dart';
 import 'package:notbad_flutter/markdown_controller.dart';
 import 'package:notbad_flutter/settings.dart';
+import 'package:notbad_flutter/sidebar.dart';
 import 'package:notbad_flutter/syntax_highlighter.dart';
 import 'package:notbad_flutter/theme.dart';
 import 'package:notbad_flutter/widgets/floating_toolbar.dart';
@@ -198,6 +201,31 @@ void main() {
       expect(find.text('Anu Script / Apple Telugu Keyboard Layout'), findsOneWidget);
       expect(find.text('తె (అను)'), findsOneWidget);
       expect(find.text('Typing Rules & Guninthalu (Matras):'), findsOneWidget);
+    });
+
+    testWidgets('FileSidebar renders header quick actions and empty state', (tester) async {
+      final palette = TracePalette.of(Brightness.light, 'azure');
+      final tempDir = Directory.systemTemp.createTempSync('notbad_test_sidebar_');
+      try {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: FileSidebar(
+              palette: palette,
+              rootPath: tempDir.path,
+              currentFile: null,
+              onOpenFile: (_) {},
+              onPickRoot: () {},
+            ),
+          ),
+        ));
+
+        expect(find.byIcon(Icons.note_add_outlined), findsOneWidget);
+        expect(find.byIcon(Icons.create_new_folder_outlined), findsOneWidget);
+        expect(find.byIcon(Icons.folder_open_outlined), findsOneWidget);
+        expect(find.text('No writing files yet'), findsOneWidget);
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
     });
   });
 }
