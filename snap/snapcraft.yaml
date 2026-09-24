@@ -1,6 +1,6 @@
 name: notbad
 base: core22
-version: '1.1.1'
+version: '1.1.2'
 summary: Distraction-free, cross-platform Markdown writer
 description: |
   NotBad is a lightweight, distraction-free Markdown editor designed for writers.

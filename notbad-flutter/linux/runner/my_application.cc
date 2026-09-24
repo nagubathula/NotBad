@@ -45,11 +45,17 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "notbad_flutter");
+    gtk_header_bar_set_title(header_bar, "NotBad");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "notbad_flutter");
+    gtk_window_set_title(window, "NotBad");
+  }
+
+  GError* icon_err = nullptr;
+  if (!gtk_window_set_icon_from_file(window, "/snap/notbad/current/meta/gui/icon.png", &icon_err)) {
+    g_clear_error(&icon_err);
+    gtk_window_set_default_icon_name("notbad");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
