@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notbad_flutter/input_methods/indic_engine.dart';
 import 'package:notbad_flutter/markdown_controller.dart';
 import 'package:notbad_flutter/settings.dart';
 import 'package:notbad_flutter/syntax_highlighter.dart';
 import 'package:notbad_flutter/theme.dart';
 import 'package:notbad_flutter/widgets/floating_toolbar.dart';
+import 'package:notbad_flutter/widgets/keyboard_layout_dialog.dart';
 import 'package:notbad_flutter/widgets/progress_ring.dart';
 import 'package:notbad_flutter/widgets/window_title_bar.dart';
 
@@ -152,6 +154,50 @@ void main() {
 
       expect(find.byType(ProgressRing), findsOneWidget);
       expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    });
+
+    testWidgets('FloatingToolbar displays language badge and triggers toggle', (tester) async {
+      final palette = TracePalette.of(Brightness.light, 'azure');
+      final controller = MarkdownEditingController(palette: palette);
+      var toggled = false;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FloatingToolbar(
+            palette: palette,
+            controller: controller,
+            wordCount: 10,
+            selWordCount: 0,
+            dailyWordGoal: 0,
+            currentLanguage: InputLanguage.teluguAnu,
+            onToggleLanguage: () => toggled = true,
+            onCycleHeading: () {},
+            onWrapSelection: (_) {},
+            onToggleList: () {},
+            onOpenFind: () {},
+            onCycleViewMode: () {},
+            onToggleFocusMode: () {},
+          ),
+        ),
+      ));
+
+      expect(find.text('తె(అను)'), findsOneWidget);
+      await tester.tap(find.text('తె(అను)'));
+      expect(toggled, isTrue);
+    });
+
+    testWidgets('KeyboardLayoutDialog renders Anu Script layout tabs and characters', (tester) async {
+      final palette = TracePalette.of(Brightness.light, 'azure');
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: KeyboardLayoutDialog(palette: palette),
+        ),
+      ));
+
+      expect(find.text('Anu Script / Apple Telugu Keyboard Layout'), findsOneWidget);
+      expect(find.text('తె (అను)'), findsOneWidget);
+      expect(find.text('Typing Rules & Guninthalu (Matras):'), findsOneWidget);
     });
   });
 }

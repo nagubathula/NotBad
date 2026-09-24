@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../input_methods/indic_engine.dart';
 import '../markdown_controller.dart';
 import '../theme.dart';
 import 'progress_ring.dart';
@@ -12,6 +13,10 @@ class FloatingToolbar extends StatelessWidget {
   final int wordCount;
   final int selWordCount;
   final int dailyWordGoal;
+  final InputLanguage currentLanguage;
+  final ValueChanged<InputLanguage>? onSelectLanguage;
+  final VoidCallback? onToggleLanguage;
+  final VoidCallback? onShowKeyboardReference;
   final VoidCallback onCycleHeading;
   final void Function(String mark) onWrapSelection;
   final VoidCallback onToggleList;
@@ -26,6 +31,10 @@ class FloatingToolbar extends StatelessWidget {
     required this.wordCount,
     required this.selWordCount,
     required this.dailyWordGoal,
+    this.currentLanguage = InputLanguage.english,
+    this.onSelectLanguage,
+    this.onToggleLanguage,
+    this.onShowKeyboardReference,
     required this.onCycleHeading,
     required this.onWrapSelection,
     required this.onToggleList,
@@ -108,6 +117,119 @@ class FloatingToolbar extends StatelessWidget {
             iconButton(Icons.filter_center_focus, 'Focus mode (Ctrl+Shift+F)',
                 onToggleFocusMode,
                 active: controller.focusMode),
+            MenuAnchor(
+              menuChildren: [
+                for (final lang in InputLanguage.values)
+                  MenuItemButton(
+                    onPressed: onSelectLanguage != null
+                        ? () => onSelectLanguage!(lang)
+                        : null,
+                    leadingIcon: Icon(
+                      lang == currentLanguage
+                          ? Icons.check
+                          : Icons.radio_button_unchecked,
+                      size: 14,
+                      color: lang == currentLanguage
+                          ? palette.accent
+                          : palette.muted,
+                    ),
+                    child: Text(
+                      '${lang.badge}   ${lang.label}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: lang == currentLanguage
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        color: lang == currentLanguage
+                            ? palette.accent
+                            : palette.fg,
+                      ),
+                    ),
+                  ),
+                const PopupMenuDivider(),
+                MenuItemButton(
+                  onPressed: onShowKeyboardReference,
+                  leadingIcon: Icon(
+                    Icons.keyboard_alt_outlined,
+                    size: 14,
+                    color: palette.accent,
+                  ),
+                  child: Text(
+                    'View Anu Keyboard Chart…',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: palette.fg,
+                    ),
+                  ),
+                ),
+              ],
+              builder: (context, menuController, child) {
+                final isIndic = currentLanguage != InputLanguage.english;
+                return Tooltip(
+                  message:
+                      'Input: ${currentLanguage.label}\nClick badge to toggle · Arrow for menu (Ctrl+M)',
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isIndic
+                            ? palette.accent.withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: isIndic
+                              ? palette.accent
+                              : palette.muted.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            borderRadius: const BorderRadius.horizontal(
+                                left: Radius.circular(5)),
+                            onTap: onToggleLanguage,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 2),
+                              child: Text(
+                                currentLanguage.badge,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color:
+                                      isIndic ? palette.accent : palette.muted,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: const BorderRadius.horizontal(
+                                right: Radius.circular(5)),
+                            onTap: () => menuController.isOpen
+                                ? menuController.close()
+                                : menuController.open(),
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                  right: 2, top: 2, bottom: 2),
+                              child: Icon(
+                                Icons.arrow_drop_down,
+                                size: 13,
+                                color: isIndic ? palette.accent : palette.muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
             if (dailyWordGoal > 0) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),

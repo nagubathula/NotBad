@@ -23,6 +23,7 @@ class AppSettings extends ChangeNotifier {
   int dailyWordGoal = 0;
   bool eInkMode = false;
   bool showGitGutter = true;
+  String inputLanguage = 'english';
 
   File? _file;
 
@@ -54,6 +55,8 @@ class AppSettings extends ChangeNotifier {
         settings.dailyWordGoal = data['dailyWordGoal'] as int? ?? 0;
         settings.eInkMode = data['eInkMode'] as bool? ?? false;
         settings.showGitGutter = data['showGitGutter'] as bool? ?? true;
+        settings.inputLanguage =
+            data['inputLanguage'] as String? ?? 'english';
       }
     } catch (_) {
       // Missing/corrupt settings are non-fatal; start with defaults.
@@ -79,6 +82,7 @@ class AppSettings extends ChangeNotifier {
         'dailyWordGoal': dailyWordGoal,
         'eInkMode': eInkMode,
         'showGitGutter': showGitGutter,
+        'inputLanguage': inputLanguage,
       }));
     } catch (_) {}
   }
@@ -145,6 +149,12 @@ class AppSettings extends ChangeNotifier {
 
   void setShowGitGutter(bool value) {
     showGitGutter = value;
+    notifyListeners();
+    _save();
+  }
+
+  void setInputLanguage(String lang) {
+    inputLanguage = lang;
     notifyListeners();
     _save();
   }

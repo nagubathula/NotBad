@@ -114,6 +114,16 @@ ThemeData buildTheme(Brightness brightness, String accentKey,
   final palette = TracePalette.of(brightness, accentKey, eInk: eInk);
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'SF Pro Text',
+    fontFamilyFallback: const [
+      'SF Pro',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      'Inter',
+      'Segoe UI',
+      'Ubuntu',
+      'sans-serif',
+    ],
     brightness: brightness,
     colorScheme: ColorScheme.fromSeed(
       seedColor: palette.accent,

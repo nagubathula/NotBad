@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'command_palette.dart';
+import 'input_methods/indic_engine.dart';
 import 'markdown_controller.dart';
 import 'quick_open.dart';
 import 'settings.dart';
@@ -22,6 +23,7 @@ import 'theme.dart';
 import 'widgets/find_replace_bar.dart';
 import 'widgets/floating_toolbar.dart';
 import 'widgets/hover_toc.dart';
+import 'widgets/keyboard_layout_dialog.dart';
 import 'widgets/window_title_bar.dart';
 
 const kAppVersion = '1.1.0';
@@ -82,6 +84,14 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   var _welcomeDismissed = false;
   var _externalDialogOpen = false;
 
+  late InputLanguage _inputLanguage;
+  String _phoneticBuffer = '';
+  int _phoneticStart = -1;
+  int _phoneticLength = 0;
+  Timer? _languageToastTimer;
+  String? _languageToastBadge;
+  String? _languageToastMessage;
+
   bool get _isTest => Platform.environment.containsKey('FLUTTER_TEST');
 
   TracePalette get _palette =>
@@ -90,6 +100,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
+    _inputLanguage = InputLanguage.fromId(widget.settings.inputLanguage);
     _controller = MarkdownEditingController(
         palette: TracePalette.of(Brightness.light, widget.settings.accent));
     _controller.viewMode = MarkdownViewMode.values.firstWhere(
@@ -333,6 +344,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       windowManager.removeListener(this);
     } catch (_) {}
     _autosaveTimer?.cancel();
+    _languageToastTimer?.cancel();
     _controller.dispose();
     _editorFocus.dispose();
     _sidebarFocus.dispose();
@@ -667,10 +679,55 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   }
 
   void _onEscape() {
+    _resetPhoneticBuffer();
     if (_findVisible) {
       _closeFind();
     } else if (_controller.focusMode) {
       _toggleFocusMode();
+    }
+  }
+
+  void _resetPhoneticBuffer() {
+    _phoneticBuffer = '';
+    _phoneticStart = -1;
+    _phoneticLength = 0;
+  }
+
+  void _showLanguageToast(InputLanguage lang) {
+    setState(() {
+      _languageToastBadge = lang.badge;
+      _languageToastMessage = lang.label;
+    });
+    _languageToastTimer?.cancel();
+    _languageToastTimer = Timer(const Duration(milliseconds: 1100), () {
+      if (mounted) {
+        setState(() {
+          _languageToastMessage = null;
+          _languageToastBadge = null;
+        });
+      }
+    });
+  }
+
+  void _showKeyboardReference() {
+    KeyboardLayoutDialog.show(context, _palette);
+  }
+
+  void _setInputLanguage(InputLanguage lang) {
+    if (_inputLanguage == lang) return;
+    _resetPhoneticBuffer();
+    setState(() {
+      _inputLanguage = lang;
+    });
+    _showLanguageToast(lang);
+    widget.settings.setInputLanguage(lang.id);
+  }
+
+  void _toggleInputLanguage() {
+    if (_inputLanguage == InputLanguage.english) {
+      _setInputLanguage(InputLanguage.teluguAnu);
+    } else {
+      _setInputLanguage(InputLanguage.english);
     }
   }
 
@@ -689,12 +746,62 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.backspace && _phoneticBuffer.isNotEmpty) {
+      final sel = _controller.selection;
+      if (sel.isValid &&
+          sel.isCollapsed &&
+          sel.start == _phoneticStart + _phoneticLength) {
+        _phoneticBuffer =
+            _phoneticBuffer.substring(0, _phoneticBuffer.length - 1);
+        final text = _controller.text;
+        if (_phoneticBuffer.isEmpty) {
+          _controller.value = TextEditingValue(
+            text: text.replaceRange(
+                _phoneticStart, _phoneticStart + _phoneticLength, ''),
+            selection: TextSelection.collapsed(offset: _phoneticStart),
+          );
+          _resetPhoneticBuffer();
+        } else {
+          final converted = _inputLanguage == InputLanguage.teluguPhonetic
+              ? IndicEngine.transliterateTelugu(_phoneticBuffer)
+              : IndicEngine.transliterateHindi(_phoneticBuffer);
+          _controller.value = TextEditingValue(
+            text: text.replaceRange(
+                _phoneticStart, _phoneticStart + _phoneticLength, converted),
+            selection: TextSelection.collapsed(
+                offset: _phoneticStart + converted.length),
+          );
+          _phoneticLength = converted.length;
+        }
+        return KeyEventResult.handled;
+      } else {
+        _resetPhoneticBuffer();
+      }
+    }
+    if (key == LogicalKeyboardKey.escape && _phoneticBuffer.isNotEmpty) {
+      _resetPhoneticBuffer();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.space) {
+      _resetPhoneticBuffer();
+    }
+    if (_phoneticBuffer.isNotEmpty &&
+        (key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight ||
+            key == LogicalKeyboardKey.arrowUp ||
+            key == LogicalKeyboardKey.arrowDown ||
+            key == LogicalKeyboardKey.home ||
+            key == LogicalKeyboardKey.end)) {
+      _resetPhoneticBuffer();
+    }
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
+      _resetPhoneticBuffer();
       if (hk.isShiftPressed) return KeyEventResult.ignored;
       return _handleEnter();
     }
     if (key == LogicalKeyboardKey.tab) {
+      _resetPhoneticBuffer();
       return _handleTab(outdent: hk.isShiftPressed);
     }
     final ch = event.character;
@@ -817,6 +924,66 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
             baseOffset: sel.start + 1, extentOffset: sel.end + 1),
       );
       return KeyEventResult.handled;
+    }
+
+    if (_inputLanguage == InputLanguage.teluguAnu) {
+      final prevChar = sel.start > 0 ? text[sel.start - 1] : '';
+      final hasPrecedingConsonant = prevChar.isNotEmpty &&
+          IndicEngine.isTeluguConsonant(prevChar.codeUnitAt(0));
+      final mapped = IndicEngine.mapTeluguAnu(ch,
+          hasPrecedingConsonant: hasPrecedingConsonant);
+      if (mapped != null) {
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(sel.start, sel.end, mapped),
+          selection:
+              TextSelection.collapsed(offset: sel.start + mapped.length),
+        );
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (_inputLanguage == InputLanguage.teluguInscript) {
+      final mapped = IndicEngine.mapTeluguInscript(ch);
+      if (mapped != null) {
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(sel.start, sel.end, mapped),
+          selection:
+              TextSelection.collapsed(offset: sel.start + mapped.length),
+        );
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (_inputLanguage == InputLanguage.teluguPhonetic ||
+        _inputLanguage == InputLanguage.hindiPhonetic) {
+      if (RegExp(r'^[a-zA-Z]$').hasMatch(ch)) {
+        if (_phoneticBuffer.isEmpty) {
+          _phoneticStart = sel.start;
+          _phoneticLength = 0;
+          _phoneticBuffer = ch;
+        } else {
+          if (sel.start == _phoneticStart + _phoneticLength) {
+            _phoneticBuffer += ch;
+          } else {
+            _phoneticStart = sel.start;
+            _phoneticLength = 0;
+            _phoneticBuffer = ch;
+          }
+        }
+        final converted = _inputLanguage == InputLanguage.teluguPhonetic
+            ? IndicEngine.transliterateTelugu(_phoneticBuffer)
+            : IndicEngine.transliterateHindi(_phoneticBuffer);
+        _controller.value = TextEditingValue(
+          text: text.replaceRange(
+              _phoneticStart, _phoneticStart + _phoneticLength, converted),
+          selection: TextSelection.collapsed(
+              offset: _phoneticStart + converted.length),
+        );
+        _phoneticLength = converted.length;
+        return KeyEventResult.handled;
+      } else {
+        _resetPhoneticBuffer();
+      }
     }
 
     final next = sel.start < text.length ? text[sel.start] : '';
@@ -1059,6 +1226,7 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   // ---- Click interactions ------------------------------------------------
 
   void _handleEditorTap() {
+    _resetPhoneticBuffer();
     final sel = _controller.selection;
     if (!sel.isValid || !sel.isCollapsed) return;
     final text = _controller.text;
@@ -1224,9 +1392,27 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
   }
 
   TextStyle get _editorTextStyle => TextStyle(
+        fontFamily: 'SF Pro Text',
         fontSize: widget.settings.editorFontSize,
         height: widget.settings.lineHeight,
         letterSpacing: 0.1,
+        fontFamilyFallback: const [
+          'SF Pro',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Inter',
+          'Noto Sans Telugu',
+          'Tenali Ramakrishna',
+          'Gautami',
+          'Nirmala UI',
+          'Vani',
+          'Mallanna',
+          'Lohit Telugu',
+          'Pothana2000',
+          'Noto Sans Devanagari',
+          'Mangal',
+          'sans-serif',
+        ],
       );
 
   /// Exact vertical position of [offset], measured by laying the text out at
@@ -1398,6 +1584,17 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
               run: () => widget.settings.setLineHeight(value)),
       ];
 
+  List<PaletteAction> _languageActions({bool searchOnly = false}) => [
+        for (final lang in InputLanguage.values)
+          PaletteAction(
+            title: 'Input Language: ${lang.label}',
+            category: 'Input',
+            searchOnly: searchOnly,
+            checked: _inputLanguage == lang,
+            run: () => _setInputLanguage(lang),
+          ),
+      ];
+
   List<PaletteAction> _settingsActions({bool searchOnly = false}) {
     final settings = widget.settings;
     return [
@@ -1547,6 +1744,23 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
           shortcut: 'Ctrl+Shift+H',
           run: () => _openSub(_viewModeActions)),
       PaletteAction(
+          title: 'Input Language…',
+          category: 'Input',
+          subtitle: _inputLanguage.label,
+          shortcut: 'Ctrl+M',
+          run: () => _openSub(_languageActions)),
+      PaletteAction(
+          title: 'View Telugu Keyboard Layout Reference…',
+          category: 'Input',
+          subtitle: 'Anu Script / Apple chart',
+          run: _showKeyboardReference),
+      PaletteAction(
+          title: 'Toggle Indian Language Input',
+          category: 'Input',
+          shortcut: 'Ctrl+M',
+          searchOnly: true,
+          run: _toggleInputLanguage),
+      PaletteAction(
           title: 'Settings…',
           category: 'App',
           subtitle:
@@ -1581,7 +1795,10 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       const SingleActivator(LogicalKeyboardKey.f3): () => _findStep(1),
       const SingleActivator(LogicalKeyboardKey.f3, shift: true): () =>
           _findStep(-1),
+      const SingleActivator(LogicalKeyboardKey.f12): _toggleInputLanguage,
       for (final meta in [false, true]) ...{
+        SingleActivator(LogicalKeyboardKey.keyM, control: !meta, meta: meta):
+            _toggleInputLanguage,
         SingleActivator(LogicalKeyboardKey.keyK, control: !meta, meta: meta):
             _showPalette,
         SingleActivator(LogicalKeyboardKey.keyS, control: !meta, meta: meta):
@@ -1694,6 +1911,73 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
                               top: _kTitleBarHeight + 6,
                               right: 16,
                               child: _buildFindBar(palette),
+                            ),
+                          if (_languageToastMessage != null)
+                            Positioned(
+                              bottom: 68,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 150),
+                                  opacity:
+                                      _languageToastMessage != null ? 1 : 0,
+                                  child: Material(
+                                    elevation: 6,
+                                    shadowColor:
+                                        Colors.black.withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: palette.toolbarBg,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                            BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: palette.accent
+                                              .withValues(alpha: 0.45),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: palette.accent
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(5),
+                                            ),
+                                            child: Text(
+                                              _languageToastBadge ?? '',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: palette.accent,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _languageToastMessage ?? '',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: palette.fg,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           Positioned(
                             bottom: 16,
@@ -1887,6 +2171,10 @@ class _EditorScreenState extends State<EditorScreen> with WindowListener {
       wordCount: _wordCount,
       selWordCount: _selWordCount,
       dailyWordGoal: widget.settings.dailyWordGoal,
+      currentLanguage: _inputLanguage,
+      onSelectLanguage: _setInputLanguage,
+      onToggleLanguage: _toggleInputLanguage,
+      onShowKeyboardReference: _showKeyboardReference,
       onCycleHeading: _cycleHeading,
       onWrapSelection: _wrapSelection,
       onToggleList: _toggleList,
