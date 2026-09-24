@@ -1,0 +1,8 @@
+# Secrets
+*.login
+snapcraft.login
+
+# Build artifacts
+dist/
+build/
+.dart_tool/
